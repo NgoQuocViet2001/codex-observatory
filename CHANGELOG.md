@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1 - 2026-03-19
+
+- Fixed the cross-platform Codex integration test so CI passes on macOS and Ubuntu as well as Windows.
+- Kept the Python-free install paths documented for Windows, macOS, and Ubuntu with npm, npx, and standalone binaries.
+
 ## 1.2.0 - 2026-03-19
 
 - Fixed the Unix integration path bug that broke CI on macOS and Ubuntu when no launcher path was passed explicitly.

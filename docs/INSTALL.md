@@ -7,21 +7,21 @@
 ### Easiest: one binary, no Python
 
 ```powershell
-Invoke-WebRequest "https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.0/codex-observatory-windows-x64.exe" -OutFile "$HOME\\codex-observatory.exe"
+Invoke-WebRequest "https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.1/codex-observatory-windows-x64.exe" -OutFile "$HOME\\codex-observatory.exe"
 & "$HOME\\codex-observatory.exe"
 ```
 
 ### If you already have Node.js
 
 ```powershell
-npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.0
+npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.1
 codex-observatory
 ```
 
 One-shot without global install:
 
 ```powershell
-npx github:NgoQuocViet2001/codex-observatory#v1.2.0 compact
+npx github:NgoQuocViet2001/codex-observatory#v1.2.1 compact
 ```
 
 ### If you already have Python
@@ -38,7 +38,7 @@ codex-observatory
 Apple Silicon:
 
 ```bash
-curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.0/codex-observatory-macos-arm64 -o ./codex-observatory
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.1/codex-observatory-macos-arm64 -o ./codex-observatory
 chmod +x ./codex-observatory
 ./codex-observatory
 ```
@@ -46,7 +46,7 @@ chmod +x ./codex-observatory
 Intel:
 
 ```bash
-curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.0/codex-observatory-macos-x64 -o ./codex-observatory
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.1/codex-observatory-macos-x64 -o ./codex-observatory
 chmod +x ./codex-observatory
 ./codex-observatory
 ```
@@ -60,14 +60,14 @@ xattr -d com.apple.quarantine ./codex-observatory
 ### If you already have Node.js
 
 ```bash
-npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.0
+npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.1
 codex-observatory
 ```
 
 One-shot without global install:
 
 ```bash
-npx github:NgoQuocViet2001/codex-observatory#v1.2.0 full
+npx github:NgoQuocViet2001/codex-observatory#v1.2.1 full
 ```
 
 ### If you already have Python
@@ -82,7 +82,7 @@ codex-observatory
 ### Easiest: one binary, no Python
 
 ```bash
-curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.0/codex-observatory-linux-x64 -o ./codex-observatory
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.1/codex-observatory-linux-x64 -o ./codex-observatory
 chmod +x ./codex-observatory
 ./codex-observatory
 ```
@@ -90,14 +90,14 @@ chmod +x ./codex-observatory
 ### If you already have Node.js
 
 ```bash
-npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.0
+npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.1
 codex-observatory
 ```
 
 One-shot without global install:
 
 ```bash
-npx github:NgoQuocViet2001/codex-observatory#v1.2.0 compact
+npx github:NgoQuocViet2001/codex-observatory#v1.2.1 compact
 ```
 
 ### If you already have Python

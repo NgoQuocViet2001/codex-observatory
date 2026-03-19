@@ -68,5 +68,9 @@ class CodexIntegrationTests(unittest.TestCase):
             self.assertTrue((codex_home / "skills" / "codex-observatory" / "SKILL.md").exists())
             self.assertTrue((codex_home / "tools" / "codex-stats.ps1").exists())
             self.assertTrue((codex_home / "tools" / "codex-stats.sh").exists())
-            self.assertTrue((codex_home / "integrations" / "codex-observatory" / "backups" / "codex.ps1.orig").exists())
+            backup_dir = codex_home / "integrations" / "codex-observatory" / "backups"
+            if sys.platform == "win32":
+                self.assertTrue((backup_dir / "codex.ps1.orig").exists())
+            else:
+                self.assertTrue((backup_dir / "codex.orig").exists())
             self.assertIn("Patched Codex shim", "\n".join(messages))
