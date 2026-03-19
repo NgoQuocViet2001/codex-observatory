@@ -5,6 +5,7 @@ Production-style local observability for Codex. Track prompts, sessions, token f
 [![CI](https://github.com/NgoQuocViet2001/codex-observatory/actions/workflows/ci.yml/badge.svg)](https://github.com/NgoQuocViet2001/codex-observatory/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/NgoQuocViet2001/codex-observatory)](https://github.com/NgoQuocViet2001/codex-observatory/releases)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)](https://www.python.org/)
+[![Node](https://img.shields.io/badge/node-18%2B-5FA04E)](https://nodejs.org/)
 
 ## Why this exists
 
@@ -23,11 +24,65 @@ It reads:
 - Bordered tables, heatmap, sparkline, load bars, and cache-share summaries.
 - JSON output for automation or scripting.
 - Works on Windows, macOS, and Linux with Python 3.10+.
+- Ships prebuilt binaries for Windows x64, macOS Intel, macOS Apple Silicon, and Linux x64.
+- Can be installed with `npm` / `npx` if you do not want to install Python first.
 - Optional shim patch so `codex stats` works as a native-feeling subcommand.
 
 ## Install
 
-### Option 1: install from GitHub with `pipx`
+### Windows
+
+No Python, direct binary:
+
+```powershell
+Invoke-WebRequest "https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.0/codex-observatory-windows-x64.exe" -OutFile "$HOME\\codex-observatory.exe"
+& "$HOME\\codex-observatory.exe"
+```
+
+Node / npm:
+
+```powershell
+npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.0
+codex-observatory
+```
+
+### macOS
+
+No Python, direct binary:
+
+```bash
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.0/codex-observatory-macos-arm64 -o ./codex-observatory
+chmod +x ./codex-observatory
+./codex-observatory
+```
+
+If you are on Intel Mac, download `codex-observatory-macos-x64` instead.
+
+Node / npm:
+
+```bash
+npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.0
+codex-observatory
+```
+
+### Ubuntu / Linux
+
+No Python, direct binary:
+
+```bash
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.0/codex-observatory-linux-x64 -o ./codex-observatory
+chmod +x ./codex-observatory
+./codex-observatory
+```
+
+Node / npm:
+
+```bash
+npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.0
+codex-observatory
+```
+
+### Python / pipx
 
 ```bash
 pipx install git+https://github.com/NgoQuocViet2001/codex-observatory.git
@@ -54,6 +109,7 @@ codex-observatory
 codex-observatory compact
 codex-observatory full --daily-days 14 --monthly-months 12
 codex-stats compact --no-color
+codex-observatory install-codex --patch-codex
 codex-observatory --json
 python -m codex_observatory full --no-color
 ```
@@ -85,6 +141,12 @@ codex stats compact
 
 Why patch the launcher? Because Codex does not have built-in stats today, and most people will naturally try `codex stats` before they remember a separate binary name.
 
+If you installed the standalone binary instead of a global command, run the same step with that binary path:
+
+```bash
+./codex-observatory install-codex --patch-codex
+```
+
 ## Docs
 
 - [Install guide](./docs/INSTALL.md)
@@ -96,10 +158,10 @@ Why patch the launcher? Because Codex does not have built-in stats today, and mo
 
 ```bash
 python -m unittest discover -s tests -v
+npm test
 python -m pip install build
-python -m build
-git tag v1.0.0
+git tag v1.2.0
 git push origin main --tags
 ```
 
-Pushing a `v*` tag triggers GitHub Actions to build `sdist` and `wheel`, then publish them as GitHub release assets.
+Pushing a `v*` tag triggers GitHub Actions to build the Python package plus standalone binaries for Windows, macOS, and Linux, then publish them as GitHub release assets.

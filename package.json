@@ -1,0 +1,31 @@
+{
+  "name": "codex-observatory",
+  "version": "1.2.0",
+  "description": "Production-style local observability and stats dashboard for Codex.",
+  "license": "MIT",
+  "type": "commonjs",
+  "bin": {
+    "codex-observatory": "npm/bin/codex-observatory.cjs",
+    "codex-stats": "npm/bin/codex-observatory.cjs"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "npm/**/*"
+  ],
+  "scripts": {
+    "postinstall": "node npm/scripts/postinstall.cjs",
+    "test": "node --test npm/tests/platform.test.cjs npm/tests/native.test.cjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NgoQuocViet2001/codex-observatory.git"
+  },
+  "homepage": "https://github.com/NgoQuocViet2001/codex-observatory",
+  "bugs": {
+    "url": "https://github.com/NgoQuocViet2001/codex-observatory/issues"
+  }
+}

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "codex-observatory"
-version = "1.1.0"
+version = "1.2.0"
 description = "Local observability and usage analytics for Codex sessions, tokens, prompts, and model trends."
 readme = "README.md"
 requires-python = ">=3.10"

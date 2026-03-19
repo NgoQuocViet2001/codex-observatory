@@ -13,6 +13,7 @@ Codex already stores prompt and token history locally, but it does not currently
 ```powershell
 .\scripts\install-codex.ps1
 .\scripts\install-codex.ps1 -PatchCodex
+codex-observatory install-codex --patch-codex
 ```
 
 ### Bash / zsh
@@ -20,6 +21,13 @@ Codex already stores prompt and token history locally, but it does not currently
 ```bash
 ./scripts/install-codex.sh
 ./scripts/install-codex.sh --patch-codex
+codex-observatory install-codex --patch-codex
+```
+
+If you are using a downloaded standalone binary, call the same command through that binary path:
+
+```bash
+./codex-observatory install-codex --patch-codex
 ```
 
 ## What gets installed

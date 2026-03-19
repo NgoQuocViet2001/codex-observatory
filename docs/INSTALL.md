@@ -1,56 +1,127 @@
 # Install Guide
 
-`codex-observatory` exists because Codex does not currently ship a built-in stats/dashboard command. The package gives you a local dashboard now, and the optional shim patch lets that experience live behind `codex stats`.
-
-## Requirements
-
-- Python 3.10 or newer
-- Access to your local Codex logs
-- A terminal that supports UTF-8 for the best dashboard output
+`codex-observatory` exists because Codex does not ship a built-in stats/dashboard command today. Pick the install path that matches what you already have on your machine.
 
 ## Windows
 
-```powershell
-git clone git@git-personal:NgoQuocViet2001/codex-observatory.git
-cd D:\Personal\Projects\codex-observatory
-python -m pip install -e .
-codex-observatory
-codex-observatory compact
-codex-observatory full --daily-days 14
-python -m codex_observatory --no-color
-```
-
-Optional built-in style integration:
+### Easiest: one binary, no Python
 
 ```powershell
-.\scripts\install-codex.ps1 -PatchCodex
-codex stats
-codex stats full
+Invoke-WebRequest "https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.0/codex-observatory-windows-x64.exe" -OutFile "$HOME\\codex-observatory.exe"
+& "$HOME\\codex-observatory.exe"
 ```
 
-## macOS / Linux
+### If you already have Node.js
 
-```bash
-git clone git@git-personal:NgoQuocViet2001/codex-observatory.git
-cd codex-observatory
-python3 -m pip install -e .
+```powershell
+npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.0
 codex-observatory
-codex-observatory compact
-codex-observatory full --daily-days 14
-python3 -m codex_observatory --no-color
 ```
 
-Optional built-in style integration:
+One-shot without global install:
 
-```bash
-./scripts/install-codex.sh --patch-codex
-codex stats
-codex stats full
+```powershell
+npx github:NgoQuocViet2001/codex-observatory#v1.2.0 compact
 ```
 
-## Install with pipx
+### If you already have Python
 
-```bash
-pipx install git+https://github.com/NgoQuocViet2001/codex-observatory.git
+```powershell
+python -m pip install git+https://github.com/NgoQuocViet2001/codex-observatory.git
 codex-observatory
+```
+
+## macOS
+
+### Easiest: one binary, no Python
+
+Apple Silicon:
+
+```bash
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.0/codex-observatory-macos-arm64 -o ./codex-observatory
+chmod +x ./codex-observatory
+./codex-observatory
+```
+
+Intel:
+
+```bash
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.0/codex-observatory-macos-x64 -o ./codex-observatory
+chmod +x ./codex-observatory
+./codex-observatory
+```
+
+If macOS blocks the binary the first time:
+
+```bash
+xattr -d com.apple.quarantine ./codex-observatory
+```
+
+### If you already have Node.js
+
+```bash
+npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.0
+codex-observatory
+```
+
+One-shot without global install:
+
+```bash
+npx github:NgoQuocViet2001/codex-observatory#v1.2.0 full
+```
+
+### If you already have Python
+
+```bash
+python3 -m pip install git+https://github.com/NgoQuocViet2001/codex-observatory.git
+codex-observatory
+```
+
+## Ubuntu / Linux
+
+### Easiest: one binary, no Python
+
+```bash
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.0/codex-observatory-linux-x64 -o ./codex-observatory
+chmod +x ./codex-observatory
+./codex-observatory
+```
+
+### If you already have Node.js
+
+```bash
+npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.0
+codex-observatory
+```
+
+One-shot without global install:
+
+```bash
+npx github:NgoQuocViet2001/codex-observatory#v1.2.0 compact
+```
+
+### If you already have Python
+
+```bash
+python3 -m pip install git+https://github.com/NgoQuocViet2001/codex-observatory.git
+codex-observatory
+```
+
+## Make `codex stats` work directly
+
+After any install method above, run:
+
+```bash
+codex-observatory install-codex --patch-codex
+codex stats
+```
+
+If you are using a downloaded standalone binary that is not on `PATH`, replace `codex-observatory` with that binary path:
+
+```powershell
+& "$HOME\codex-observatory.exe" install-codex --patch-codex
+```
+
+```bash
+./codex-observatory install-codex --patch-codex
 ```

@@ -962,6 +962,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     configure_stdio()
+    argv = list(argv) if argv is not None else list(sys.argv[1:])
+    if argv and argv[0] == "install-codex":
+        from . import codex_integration
+
+        integration_args = list(argv[1:])
+        if getattr(sys, "frozen", False):
+            integration_args = ["--runner-bin", sys.executable, *integration_args]
+        else:
+            integration_args = ["--python-bin", sys.executable, *integration_args]
+        return codex_integration.main(integration_args)
+
     parser = build_parser()
     args = parser.parse_args(argv)
 

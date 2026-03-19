@@ -12,10 +12,10 @@ on:
         type: string
 
 jobs:
-  release:
+  python-dist:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -24,12 +24,71 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Build artifacts
+      - name: Build Python artifacts
         run: |
           python -m pip install build
           python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/*
+
+  native-binaries:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            asset_name: codex-observatory-windows-x64.exe
+            binary_path: dist/codex-observatory.exe
+          - os: ubuntu-latest
+            asset_name: codex-observatory-linux-x64
+            binary_path: dist/codex-observatory
+          - os: macos-13
+            asset_name: codex-observatory-macos-x64
+            binary_path: dist/codex-observatory
+          - os: macos-14
+            asset_name: codex-observatory-macos-arm64
+            binary_path: dist/codex-observatory
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build native binary
+        run: |
+          python -m pip install . pyinstaller
+          python -m PyInstaller --onefile --clean --name codex-observatory --paths src src/codex_observatory/__main__.py
+      - name: Rename native artifact
+        run: |
+          python -c "from pathlib import Path; import shutil; src = Path(r'${{ matrix.binary_path }}'); dst = Path('dist') / r'${{ matrix.asset_name }}'; shutil.copy2(src, dst)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: dist/${{ matrix.asset_name }}
+
+  release:
+    needs:
+      - python-dist
+      - native-binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: dist/*
+          files: release-assets/*

@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from codex_observatory.codex_integration import (
+    default_runner_command,
     install_integration,
     patch_cmd_shim,
     patch_powershell_shim,
@@ -56,12 +57,12 @@ class CodexIntegrationTests(unittest.TestCase):
             (shim_dir / "codex").write_text('#!/bin/sh\nif [ -x "$basedir/node" ]; then\nfi\n', encoding="utf-8")
 
             messages = install_integration(
-                repo_root=repo_root,
                 codex_home=codex_home,
-                python_bin="python",
+                repo_root=repo_root,
+                runner_command=default_runner_command(python_bin="python"),
                 patch_codex=True,
                 shim_dir=shim_dir,
-                codex_bin=None,
+                codex_bin=(shim_dir / "codex") if sys.platform != "win32" else None,
             )
 
             self.assertTrue((codex_home / "skills" / "codex-observatory" / "SKILL.md").exists())

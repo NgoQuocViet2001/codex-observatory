@@ -46,6 +46,7 @@ codex-stats
 After running the integration installer with patch mode:
 
 ```bash
+codex-observatory install-codex --patch-codex
 codex stats
 codex stats compact
 codex stats full --daily-days 14

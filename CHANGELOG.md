@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0 - 2026-03-19
+
+- Fixed the Unix integration path bug that broke CI on macOS and Ubuntu when no launcher path was passed explicitly.
+- Added a standalone `install-codex` command so Python installs, native binaries, and npm installs can all wire `codex stats` into Codex the same way.
+- Added npm/npx distribution support and prepared release assets for platform-specific standalone binaries.
+- Rewrote install guidance to be clearer for Windows, macOS, and Ubuntu users.
+
 ## 1.1.0 - 2026-03-19
 
 - Added an optional Codex launcher patch so `codex stats` and `codex stat` work directly.
