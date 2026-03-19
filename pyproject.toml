@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codex-observatory"
+version = "1.0.0"
+description = "Local observability and usage analytics for Codex sessions, tokens, prompts, and model trends."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+  { name = "Ngo Quoc Viet" }
+]
+keywords = [
+  "codex",
+  "openai",
+  "observability",
+  "dashboard",
+  "analytics",
+  "tokens",
+  "cli"
+]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Utilities"
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/NgoQuocViet2001/codex-observatory"
+Repository = "https://github.com/NgoQuocViet2001/codex-observatory"
+Issues = "https://github.com/NgoQuocViet2001/codex-observatory/issues"
+Changelog = "https://github.com/NgoQuocViet2001/codex-observatory/blob/main/CHANGELOG.md"
+
+[project.scripts]
+codex-observatory = "codex_observatory.cli:main"
+codex-stats = "codex_observatory.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
