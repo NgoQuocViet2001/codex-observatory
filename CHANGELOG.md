@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.2 - 2026-03-19
+
+- Switched the macOS release build to the current GitHub Actions macOS runner labels so the native release matrix does not get canceled mid-run.
+- Kept the `v1.2.1` fixes: green CI across Windows, macOS, and Ubuntu plus clear no-Python install paths.
+
 ## 1.2.1 - 2026-03-19
 
 - Fixed the cross-platform Codex integration test so CI passes on macOS and Ubuntu as well as Windows.

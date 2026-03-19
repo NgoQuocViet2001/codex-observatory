@@ -35,14 +35,14 @@ It reads:
 No Python, direct binary:
 
 ```powershell
-Invoke-WebRequest "https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.1/codex-observatory-windows-x64.exe" -OutFile "$HOME\\codex-observatory.exe"
+Invoke-WebRequest "https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.2/codex-observatory-windows-x64.exe" -OutFile "$HOME\\codex-observatory.exe"
 & "$HOME\\codex-observatory.exe"
 ```
 
 Node / npm:
 
 ```powershell
-npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.1
+npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.2
 codex-observatory
 ```
 
@@ -51,7 +51,7 @@ codex-observatory
 No Python, direct binary:
 
 ```bash
-curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.1/codex-observatory-macos-arm64 -o ./codex-observatory
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.2/codex-observatory-macos-arm64 -o ./codex-observatory
 chmod +x ./codex-observatory
 ./codex-observatory
 ```
@@ -61,7 +61,7 @@ If you are on Intel Mac, download `codex-observatory-macos-x64` instead.
 Node / npm:
 
 ```bash
-npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.1
+npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.2
 codex-observatory
 ```
 
@@ -70,7 +70,7 @@ codex-observatory
 No Python, direct binary:
 
 ```bash
-curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.1/codex-observatory-linux-x64 -o ./codex-observatory
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.2/codex-observatory-linux-x64 -o ./codex-observatory
 chmod +x ./codex-observatory
 ./codex-observatory
 ```
@@ -78,7 +78,7 @@ chmod +x ./codex-observatory
 Node / npm:
 
 ```bash
-npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.1
+npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.2
 codex-observatory
 ```
 
@@ -160,7 +160,7 @@ If you installed the standalone binary instead of a global command, run the same
 python -m unittest discover -s tests -v
 npm test
 python -m pip install build
-git tag v1.2.1
+git tag v1.2.2
 git push origin main --tags
 ```
 

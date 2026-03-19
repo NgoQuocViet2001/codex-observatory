@@ -1,6 +1,6 @@
 {
   "name": "codex-observatory",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Production-style local observability and stats dashboard for Codex.",
   "license": "MIT",
   "type": "commonjs",
