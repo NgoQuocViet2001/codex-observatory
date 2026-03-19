@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.5 - 2026-03-19
 
 - Fixed the missing `history.jsonl` crash on newer Codex installs by reconstructing prompt history from `sessions/**/*.jsonl` when needed.
 - Taught the npm wrapper to backfill a synthetic `~/.codex/history.jsonl` for current native releases and to refresh `codex stats` helper scripts so npm installs keep going through the compatibility wrapper.
