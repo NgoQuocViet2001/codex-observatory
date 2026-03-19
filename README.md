@@ -16,6 +16,38 @@ It reads:
 - `~/.codex/history.jsonl`
 - `~/.codex/sessions/**/*.jsonl`
 
+## What you get after install
+
+`codex-observatory` is a standalone CLI first.
+
+It does **not** automatically turn into `codex stats` unless you run the optional Codex integration patch.
+
+| What you want | What you install | Command that works right away | Extra step for `codex stats` |
+| --- | --- | --- | --- |
+| Standalone dashboard with no patching | Binary, `npm`, or `pip` | `codex-observatory` | Yes |
+| Short standalone alias | `npm` or `pip` | `codex-stats` | Yes |
+| Native-feeling Codex subcommand | Any install method | `codex-observatory` first | Run `install-codex --patch-codex` |
+
+If you only do this:
+
+```bash
+codex-observatory
+```
+
+then you have the standalone dashboard only.
+
+If you want this:
+
+```bash
+codex stats
+```
+
+you must run the extra integration step:
+
+```bash
+codex-observatory install-codex --patch-codex
+```
+
 ## Highlights
 
 - Live local metrics without calling any remote API.
@@ -30,6 +62,12 @@ It reads:
 
 ## Install
 
+Choose the outcome you want:
+
+- `codex-observatory`: standalone dashboard command
+- `codex-stats`: short standalone alias, available for `npm` and `pip` installs
+- `codex stats`: built-in style Codex subcommand, available only after the patch step
+
 ### Windows
 
 No Python, direct binary:
@@ -39,11 +77,26 @@ Invoke-WebRequest "https://github.com/NgoQuocViet2001/codex-observatory/releases
 & "$HOME\\codex-observatory.exe"
 ```
 
+Enable `codex stats` after the binary install:
+
+```powershell
+& "$HOME\\codex-observatory.exe" install-codex --patch-codex
+codex stats
+```
+
 Node / npm:
 
 ```powershell
 npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.2
 codex-observatory
+codex-stats
+```
+
+Enable `codex stats` after the npm install:
+
+```powershell
+codex-observatory install-codex --patch-codex
+codex stats
 ```
 
 ### macOS
@@ -58,11 +111,26 @@ chmod +x ./codex-observatory
 
 If you are on Intel Mac, download `codex-observatory-macos-x64` instead.
 
+Enable `codex stats` after the binary install:
+
+```bash
+./codex-observatory install-codex --patch-codex
+codex stats
+```
+
 Node / npm:
 
 ```bash
 npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.2
 codex-observatory
+codex-stats
+```
+
+Enable `codex stats` after the npm install:
+
+```bash
+codex-observatory install-codex --patch-codex
+codex stats
 ```
 
 ### Ubuntu / Linux
@@ -75,17 +143,36 @@ chmod +x ./codex-observatory
 ./codex-observatory
 ```
 
+Enable `codex stats` after the binary install:
+
+```bash
+./codex-observatory install-codex --patch-codex
+codex stats
+```
+
 Node / npm:
 
 ```bash
 npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.2
 codex-observatory
+codex-stats
+```
+
+Enable `codex stats` after the npm install:
+
+```bash
+codex-observatory install-codex --patch-codex
+codex stats
 ```
 
 ### Python / pipx
 
 ```bash
 pipx install git+https://github.com/NgoQuocViet2001/codex-observatory.git
+codex-observatory
+codex-stats
+codex-observatory install-codex --patch-codex
+codex stats
 ```
 
 ### Option 2: install from a local clone
@@ -116,6 +203,13 @@ python -m codex_observatory full --no-color
 
 ## Optional Codex integration
 
+Important:
+
+- `codex-observatory` and `codex-stats` are standalone commands
+- `codex stats` is a separate, optional integration step
+- `./scripts/install-codex.ps1` and `./scripts/install-codex.sh` are mainly for people who cloned this repo locally
+- if you installed from a binary, `npm`, or `pip`, prefer `codex-observatory install-codex --patch-codex`
+
 ### PowerShell
 
 ```powershell
@@ -130,7 +224,9 @@ python -m codex_observatory full --no-color
 ./scripts/install-codex.sh --patch-codex
 ```
 
-The default install adds the local package, helper scripts, and a Codex skill into `~/.codex/skills/codex-observatory`.
+The default script install adds the local package, helper scripts, and a Codex skill into `~/.codex/skills/codex-observatory`.
+
+It does **not** enable `codex stats` yet.
 
 The optional patch mode also injects a small dispatch hook into the local `codex` launcher so these work directly:
 

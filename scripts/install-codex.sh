@@ -49,12 +49,17 @@ echo
 echo "Done."
 echo "Try:"
 if [ "$PATCH_CODEX" -eq 1 ]; then
+  echo "  This install includes the Codex launcher patch."
   echo "  codex stats"
   echo "  codex stats compact"
 else
+  echo "  This install adds the Codex skill and helper tools only."
+  echo "  It does NOT enable \`codex stats\` yet."
+  echo
+  echo "  codex-observatory"
   echo "  codex-stats"
   echo "  codex-stats compact"
   echo
-  echo "Need a built-in style Codex subcommand?"
+  echo "Want a built-in style Codex subcommand?"
   echo "  ./scripts/install-codex.sh --patch-codex"
 fi
