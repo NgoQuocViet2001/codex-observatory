@@ -93,6 +93,9 @@ class CodexIntegrationTests(unittest.TestCase):
             (shim_dir / "codex.ps1").write_text(original_ps1, encoding="utf-8")
             (shim_dir / "codex.cmd").write_text(original_cmd, encoding="utf-8")
             (shim_dir / "codex").write_text(original_sh, encoding="utf-8")
+            expected_ps1 = (shim_dir / "codex.ps1").read_text(encoding="utf-8")
+            expected_cmd = (shim_dir / "codex.cmd").read_text(encoding="utf-8")
+            expected_sh = (shim_dir / "codex").read_text(encoding="utf-8")
 
             install_integration(
                 codex_home=codex_home,
@@ -114,9 +117,9 @@ class CodexIntegrationTests(unittest.TestCase):
             self.assertFalse((codex_home / "tools" / "codex-stats.sh").exists())
             self.assertFalse((codex_home / "integrations" / "codex-observatory").exists())
             if sys.platform == "win32":
-                self.assertEqual((shim_dir / "codex.ps1").read_text(encoding="utf-8"), original_ps1)
-                self.assertEqual((shim_dir / "codex.cmd").read_text(encoding="utf-8"), original_cmd)
-                self.assertEqual((shim_dir / "codex").read_text(encoding="utf-8"), original_sh)
+                self.assertEqual((shim_dir / "codex.ps1").read_text(encoding="utf-8"), expected_ps1)
+                self.assertEqual((shim_dir / "codex.cmd").read_text(encoding="utf-8"), expected_cmd)
+                self.assertEqual((shim_dir / "codex").read_text(encoding="utf-8"), expected_sh)
             else:
-                self.assertEqual((shim_dir / "codex").read_text(encoding="utf-8"), original_sh)
+                self.assertEqual((shim_dir / "codex").read_text(encoding="utf-8"), expected_sh)
             self.assertIn("Removed helper tool", "\n".join(messages))
