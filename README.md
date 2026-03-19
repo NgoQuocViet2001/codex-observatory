@@ -8,7 +8,7 @@ Production-style local observability for Codex. Track prompts, sessions, token f
 
 ## Why this exists
 
-Most Codex usage data already lives on your machine. `codex-observatory` turns that local telemetry into a clean CLI dashboard instead of forcing you to inspect raw JSONL files.
+Codex already writes rich local usage logs, but it does not ship a built-in `codex stats` command, dashboard, or token analytics view. `codex-observatory` exists to close that gap and turn raw JSONL telemetry into a production-style local dashboard.
 
 It reads:
 
@@ -23,6 +23,7 @@ It reads:
 - Bordered tables, heatmap, sparkline, load bars, and cache-share summaries.
 - JSON output for automation or scripting.
 - Works on Windows, macOS, and Linux with Python 3.10+.
+- Optional shim patch so `codex stats` works as a native-feeling subcommand.
 
 ## Install
 
@@ -63,15 +64,26 @@ python -m codex_observatory full --no-color
 
 ```powershell
 .\scripts\install-codex.ps1
+.\scripts\install-codex.ps1 -PatchCodex
 ```
 
 ### Bash / zsh
 
 ```bash
 ./scripts/install-codex.sh
+./scripts/install-codex.sh --patch-codex
 ```
 
-That step installs the package locally and copies a Codex skill into `~/.codex/skills/codex-observatory`.
+The default install adds the local package, helper scripts, and a Codex skill into `~/.codex/skills/codex-observatory`.
+
+The optional patch mode also injects a small dispatch hook into the local `codex` launcher so these work directly:
+
+```bash
+codex stats
+codex stats compact
+```
+
+Why patch the launcher? Because Codex does not have built-in stats today, and most people will naturally try `codex stats` before they remember a separate binary name.
 
 ## Docs
 

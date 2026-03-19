@@ -1,5 +1,7 @@
 # Install Guide
 
+`codex-observatory` exists because Codex does not currently ship a built-in stats/dashboard command. The package gives you a local dashboard now, and the optional shim patch lets that experience live behind `codex stats`.
+
 ## Requirements
 
 - Python 3.10 or newer
@@ -18,6 +20,14 @@ codex-observatory full --daily-days 14
 python -m codex_observatory --no-color
 ```
 
+Optional built-in style integration:
+
+```powershell
+.\scripts\install-codex.ps1 -PatchCodex
+codex stats
+codex stats full
+```
+
 ## macOS / Linux
 
 ```bash
@@ -28,6 +38,14 @@ codex-observatory
 codex-observatory compact
 codex-observatory full --daily-days 14
 python3 -m codex_observatory --no-color
+```
+
+Optional built-in style integration:
+
+```bash
+./scripts/install-codex.sh --patch-codex
+codex stats
+codex stats full
 ```
 
 ## Install with pipx

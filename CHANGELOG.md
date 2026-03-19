@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.0 - 2026-03-19
+
+- Added an optional Codex launcher patch so `codex stats` and `codex stat` work directly.
+- Added packaged helper tools under `~/.codex/tools` for both PowerShell and Bash-based Codex launchers.
+- Added backup-aware launcher patching so existing Codex shims are preserved before modification.
+- Updated the install and integration guides to explain that this repo exists because Codex does not currently ship built-in stats.
+
 ## 1.0.0 - 2026-03-19
 
 - First public release of `codex-observatory`.

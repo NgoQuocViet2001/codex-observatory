@@ -1,5 +1,7 @@
 # Usage Guide
 
+This repo exists because Codex does not expose a native stats command yet. `codex-observatory` gives you that missing view from local logs.
+
 ## Default dashboard
 
 ```bash
@@ -37,4 +39,14 @@ codex-observatory --now 2026-03-19T10:00:00
 
 ```bash
 codex-stats
+```
+
+## Optional native-feeling Codex command
+
+After running the integration installer with patch mode:
+
+```bash
+codex stats
+codex stats compact
+codex stats full --daily-days 14
 ```

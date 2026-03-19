@@ -1,22 +1,39 @@
 param(
-    [string]$Python = "python"
+    [string]$Python = "python",
+    [switch]$PatchCodex
 )
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME ".codex" }
-$skillSource = Join-Path $repoRoot "integrations\codex-skill\SKILL.md"
-$skillDir = Join-Path $codexHome "skills\codex-observatory"
+$pythonPath = (Get-Command $Python -ErrorAction Stop).Source
 
 Write-Host "Installing codex-observatory package..."
-& $Python -m pip install -e $repoRoot
+& $pythonPath -m pip install -e $repoRoot
 
-Write-Host "Installing Codex skill into $skillDir ..."
-New-Item -ItemType Directory -Force -Path $skillDir | Out-Null
-Copy-Item -Path $skillSource -Destination (Join-Path $skillDir "SKILL.md") -Force
+Write-Host "Installing Codex integration assets..."
+$integrationArgs = @(
+    "-m",
+    "codex_observatory.codex_integration",
+    "--repo-root",
+    $repoRoot,
+    "--python-bin",
+    $pythonPath
+)
+if ($PatchCodex) {
+    $integrationArgs += "--patch-codex"
+}
+& $pythonPath @integrationArgs
 
 Write-Host ""
 Write-Host "Done."
 Write-Host "Try:"
-Write-Host "  codex-stats"
-Write-Host "  codex-stats compact"
+if ($PatchCodex) {
+    Write-Host "  codex stats"
+    Write-Host "  codex stats compact"
+} else {
+    Write-Host "  codex-stats"
+    Write-Host "  codex-stats compact"
+    Write-Host ""
+    Write-Host "Need a built-in style Codex subcommand?"
+    Write-Host "  .\scripts\install-codex.ps1 -PatchCodex"
+}
