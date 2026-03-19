@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.4 - 2026-03-19
+
+- Synced the Python package version with the npm/native release version so wheel, sdist, npm, and binary assets all publish the same release number.
+- Kept the `v1.2.3` fixes: Windows GitHub-based npm installs no longer depend on `postinstall`, and the Windows native binary entrypoint now starts correctly.
+
 ## 1.2.3 - 2026-03-19
 
 - Fixed `npm install -g github:NgoQuocViet2001/codex-observatory` on Windows by removing the npm `postinstall` dependency and downloading the native binary on first run instead.
