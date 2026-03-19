@@ -166,6 +166,7 @@ codex stats
 - `codex stats` requires Codex to already be installed on the machine.
 - `codex-observatory` works without patching.
 - `codex-stats` is available for `npm` and `pip` installs.
+- `npm` installs download the matching native binary on first run.
 
 ## Docs
 

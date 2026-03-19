@@ -128,3 +128,4 @@ codex stats
 - `codex stats` patches the local `codex` launcher.
 - `codex stats` requires Codex to already exist on the machine.
 - `codex-observatory` works even without patching Codex.
+- `npm` installs download the native binary on first run.

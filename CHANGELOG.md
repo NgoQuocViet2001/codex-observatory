@@ -2,7 +2,7 @@
 
 ## 1.2.3 - 2026-03-19
 
-- Fixed `npm install -g github:NgoQuocViet2001/codex-observatory` on Windows by moving the npm postinstall entrypoint to a root-level script instead of relying on `npm/scripts/postinstall.cjs`.
+- Fixed `npm install -g github:NgoQuocViet2001/codex-observatory` on Windows by removing the npm `postinstall` dependency and downloading the native binary on first run instead.
 - Fixed the Windows native binary entrypoint so `codex-observatory.exe` and the npm-downloaded Windows binary start correctly.
 - Kept the quickstart docs short and command-first for Windows, macOS, and Ubuntu.
 

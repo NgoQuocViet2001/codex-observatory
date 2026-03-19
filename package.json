@@ -12,11 +12,9 @@
     "README.md",
     "LICENSE",
     "bin/**/*",
-    "lib/**/*",
-    "postinstall.cjs"
+    "lib/**/*"
   ],
   "scripts": {
-    "postinstall": "node postinstall.cjs",
     "test": "node --test npm/tests/platform.test.cjs npm/tests/native.test.cjs"
   },
   "engines": {
