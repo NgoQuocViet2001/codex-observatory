@@ -11,5 +11,6 @@ coverage.xml
 .DS_Store
 Thumbs.db
 npm/native/
+native/
 *.tgz
 *.spec
