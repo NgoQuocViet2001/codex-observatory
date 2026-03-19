@@ -10,7 +10,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Sequence
+from typing import Callable, Sequence
 
 from . import __version__
 
@@ -434,9 +434,16 @@ def build_report(
     monthly_months: int,
     heatmap_weeks: int,
     top_models: int,
+    status: Callable[[str], None] | None = None,
 ) -> Report:
+    if status:
+        status("Reading prompt history...")
     prompt_events, latest_prompt_time = load_history(codex_home)
+    if status:
+        status("Scanning session logs...")
     turn_events, token_events, latest_token_time, latest_model = load_sessions(codex_home)
+    if status:
+        status("Aggregating trends and model usage...")
 
     prompt_by_date = Counter(event.date_key for event in prompt_events)
     prompt_by_month = Counter(event.month_key for event in prompt_events)
@@ -980,6 +987,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     resolved_view = resolve_view(args.view, width)
     now = parse_local_time(args.now) if args.now else datetime.now().replace(microsecond=0)
     codex_home = resolve_codex_home(args.codex_home)
+    show_status = not args.json and not os.environ.get("CODEX_STATS_QUIET")
+
+    def emit_status(message: str) -> None:
+        if not show_status:
+            return
+        sys.stdout.write(f"[codex-observatory] {message}\n")
+        sys.stdout.flush()
 
     try:
         report = build_report(
@@ -989,6 +1003,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             monthly_months=max(3, min(18, args.monthly_months)),
             heatmap_weeks=max(4, min(52, args.heatmap_weeks)),
             top_models=max(3, min(12, args.top_models)),
+            status=emit_status,
         )
     except FileNotFoundError as exc:
         parser.error(str(exc))
