@@ -21,6 +21,7 @@ class CodexObservatoryTests(unittest.TestCase):
     def make_fixture(self, *, include_history: bool = True, include_sessions: bool = True) -> Path:
         temp_dir = Path(tempfile.mkdtemp())
         codex_home = temp_dir / ".codex"
+        codex_home.mkdir(parents=True, exist_ok=True)
         sessions_dir = codex_home / "sessions" / "2026" / "03" / "19"
         if include_sessions:
             sessions_dir.mkdir(parents=True)
