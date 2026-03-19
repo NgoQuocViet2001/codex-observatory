@@ -34,6 +34,15 @@ Invoke-WebRequest "https://github.com/NgoQuocViet2001/codex-observatory/releases
 codex stats
 ```
 
+Windows ARM64:
+
+```powershell
+Invoke-WebRequest "https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-windows-arm64.exe" -OutFile "$HOME\\codex-observatory.exe"
+& "$HOME\\codex-observatory.exe"
+& "$HOME\\codex-observatory.exe" install-codex --patch-codex
+codex stats
+```
+
 ## macOS
 
 ### Node.js path
@@ -100,6 +109,16 @@ chmod +x ./codex-observatory
 codex stats
 ```
 
+Linux ARM64:
+
+```bash
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-linux-arm64 -o ./codex-observatory
+chmod +x ./codex-observatory
+./codex-observatory
+./codex-observatory install-codex --patch-codex
+codex stats
+```
+
 ## Python / pipx
 
 ```bash
@@ -130,3 +149,4 @@ codex stats
 - `codex-observatory` works even without patching Codex.
 - `npm` installs download the native binary on first run.
 - Newer Codex installs may not have `~/.codex/history.jsonl`; `codex-observatory` now reconstructs prompt history from `sessions/**/*.jsonl` automatically.
+- Older Codex installs that only have `~/.codex/history.jsonl` still work; prompt/session counts come from history and token/model fields fall back to zero or `unknown` when session logs do not exist.

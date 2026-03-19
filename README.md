@@ -71,6 +71,15 @@ Invoke-WebRequest "https://github.com/NgoQuocViet2001/codex-observatory/releases
 codex stats
 ```
 
+Windows ARM64:
+
+```powershell
+Invoke-WebRequest "https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-windows-arm64.exe" -OutFile "$HOME\\codex-observatory.exe"
+& "$HOME\\codex-observatory.exe"
+& "$HOME\\codex-observatory.exe" install-codex --patch-codex
+codex stats
+```
+
 ### macOS
 
 If you already have Node.js:
@@ -125,6 +134,16 @@ chmod +x ./codex-observatory
 codex stats
 ```
 
+Linux ARM64:
+
+```bash
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-linux-arm64 -o ./codex-observatory
+chmod +x ./codex-observatory
+./codex-observatory
+./codex-observatory install-codex --patch-codex
+codex stats
+```
+
 ## Common Cases
 
 | Case | Command |
@@ -168,6 +187,7 @@ codex stats
 - `codex-stats` is available for `npm` and `pip` installs.
 - `npm` installs download the matching native binary on first run.
 - If `history.jsonl` is missing, `codex-observatory` rebuilds prompt history from session logs instead of failing.
+- If `sessions/` is missing but `history.jsonl` exists, `codex-observatory` still renders prompt/session counts and falls back to zero token totals plus `unknown` model metadata.
 
 ## Docs
 

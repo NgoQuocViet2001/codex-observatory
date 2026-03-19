@@ -10,7 +10,7 @@ codex-observatory
 
 This works on both Codex layouts:
 
-- older installs with `~/.codex/history.jsonl`
+- older installs with `~/.codex/history.jsonl`, with or without `~/.codex/sessions/`
 - newer installs that only keep `~/.codex/sessions/**/*.jsonl`
 
 ### 2. Open a shorter dashboard

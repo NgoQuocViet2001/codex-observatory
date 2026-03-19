@@ -42,8 +42,14 @@ jobs:
           - os: windows-latest
             asset_name: codex-observatory-windows-x64.exe
             binary_path: dist/codex-observatory.exe
+          - os: windows-11-arm
+            asset_name: codex-observatory-windows-arm64.exe
+            binary_path: dist/codex-observatory.exe
           - os: ubuntu-latest
             asset_name: codex-observatory-linux-x64
+            binary_path: dist/codex-observatory
+          - os: ubuntu-24.04-arm
+            asset_name: codex-observatory-linux-arm64
             binary_path: dist/codex-observatory
           - os: macos-15-intel
             asset_name: codex-observatory-macos-x64

@@ -18,11 +18,12 @@ def unix_seconds(value: str) -> int:
 
 
 class CodexObservatoryTests(unittest.TestCase):
-    def make_fixture(self, *, include_history: bool = True) -> Path:
+    def make_fixture(self, *, include_history: bool = True, include_sessions: bool = True) -> Path:
         temp_dir = Path(tempfile.mkdtemp())
         codex_home = temp_dir / ".codex"
         sessions_dir = codex_home / "sessions" / "2026" / "03" / "19"
-        sessions_dir.mkdir(parents=True)
+        if include_sessions:
+            sessions_dir.mkdir(parents=True)
 
         history_rows = [
             {"session_id": "session-a", "ts": unix_seconds("2026-03-18T01:00:00")},
@@ -141,8 +142,15 @@ class CodexObservatoryTests(unittest.TestCase):
             },
         ]
 
-        (sessions_dir / "session-a.jsonl").write_text("\n".join(json.dumps(row) for row in session_a) + "\n", encoding="utf-8")
-        (sessions_dir / "session-b.jsonl").write_text("\n".join(json.dumps(row) for row in session_b) + "\n", encoding="utf-8")
+        if include_sessions:
+            (sessions_dir / "session-a.jsonl").write_text(
+                "\n".join(json.dumps(row) for row in session_a) + "\n",
+                encoding="utf-8",
+            )
+            (sessions_dir / "session-b.jsonl").write_text(
+                "\n".join(json.dumps(row) for row in session_b) + "\n",
+                encoding="utf-8",
+            )
         return codex_home
 
     def run_cli(self, *args: str) -> subprocess.CompletedProcess[str]:
@@ -187,6 +195,17 @@ class CodexObservatoryTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(payload["summary"]["all_time"]["prompts"], 3)
         self.assertTrue(payload["codex_home"].endswith(".codex"))
+
+    def test_json_summary_works_with_history_only_codex_home(self) -> None:
+        codex_home = self.make_fixture(include_sessions=False)
+        result = self.run_cli("--json", "--codex-home", str(codex_home), "--now", "2026-03-19T10:00:00")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["summary"]["today"]["prompts"], 1)
+        self.assertEqual(payload["summary"]["all_time"]["prompts"], 3)
+        self.assertEqual(payload["summary"]["all_time"]["sessions"], 2)
+        self.assertEqual(payload["summary"]["all_time"]["tokens"], 0)
+        self.assertEqual(payload["summary"]["latest_model"], "unknown")
 
     def test_text_dashboard_renders_core_sections(self) -> None:
         codex_home = self.make_fixture()

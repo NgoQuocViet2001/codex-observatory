@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.6 - 2026-03-19
+
+- Added a true `history.jsonl` fallback for older Codex installs that do not have a `sessions/` directory, so the dashboard still opens with prompt/session counts instead of failing.
+- Added native npm/release support for `linux-arm64` and `windows-arm64`, plus ARM smoke coverage in CI.
+- Updated install and usage docs to call out both history-only Codex homes and the new ARM64 binary assets.
+
 ## 1.2.5 - 2026-03-19
 
 - Fixed the missing `history.jsonl` crash on newer Codex installs by reconstructing prompt history from `sessions/**/*.jsonl` when needed.

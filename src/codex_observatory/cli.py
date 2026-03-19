@@ -547,9 +547,18 @@ def build_report(
     status: Callable[[str], None] | None = None,
 ) -> Report:
     prompt_events, latest_prompt_time = load_prompt_history(codex_home, status=status)
+    history_path = codex_home / "history.jsonl"
+    sessions_root = codex_home / "sessions"
     if status:
         status("Scanning session logs...")
-    turn_events, token_events, latest_token_time, latest_model = load_sessions(codex_home)
+    if sessions_root.exists():
+        turn_events, token_events, latest_token_time, latest_model = load_sessions(codex_home)
+    elif history_path.exists():
+        turn_events, token_events, latest_token_time, latest_model = [], [], None, "unknown"
+        if status:
+            status("Session logs not found; using history.jsonl only for prompt/session counts...")
+    else:
+        raise FileNotFoundError(f"Missing sessions directory: {sessions_root}")
     if status:
         status("Aggregating trends and model usage...")
 
