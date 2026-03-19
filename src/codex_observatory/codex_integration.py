@@ -175,6 +175,54 @@ def patch_file(path: Path, patcher, backup_dir: Path) -> bool:
     return True
 
 
+def integration_targets(*, codex_home: Path) -> tuple[Path, Path, Path]:
+    skill_dir = codex_home / "skills" / "codex-observatory"
+    tool_dir = codex_home / "tools"
+    integration_dir = codex_home / "integrations" / "codex-observatory"
+    return skill_dir, tool_dir, integration_dir
+
+
+def launcher_targets(*, shim_dir: Path | None = None, codex_bin: Path | None = None):
+    if os.name == "nt":
+        shim_root = shim_dir or Path(os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming"))) / "npm"
+        return [
+            (shim_root / "codex.ps1", patch_powershell_shim),
+            (shim_root / "codex.cmd", patch_cmd_shim),
+            (shim_root / "codex", patch_shell_shim),
+        ]
+    found_codex = str(codex_bin) if codex_bin else shutil.which("codex")
+    return [(Path(found_codex).resolve(), patch_shell_shim)] if found_codex else []
+
+
+def unlink_if_exists(path: Path) -> bool:
+    if not path.exists() or path.is_dir():
+        return False
+    path.unlink()
+    return True
+
+
+def rmtree_if_exists(path: Path) -> bool:
+    if not path.exists():
+        return False
+    if path.is_dir():
+        shutil.rmtree(path)
+    else:
+        path.unlink()
+    return True
+
+
+def prune_empty_dirs(path: Path, *, stop_at: Path) -> None:
+    current = path
+    while current.exists() and current.is_dir():
+        try:
+            current.rmdir()
+        except OSError:
+            break
+        if current == stop_at:
+            break
+        current = current.parent
+
+
 def render_stats_ps1(runner_command: list[str]) -> str:
     runner_items = ", ".join(f"'{escape_ps_single(item)}'" for item in runner_command)
     return (
@@ -233,11 +281,11 @@ def install_integration(
 ) -> list[str]:
     messages: list[str] = []
 
-    skill_target = codex_home / "skills" / "codex-observatory" / "SKILL.md"
+    skill_dir, tool_dir, integration_dir = integration_targets(codex_home=codex_home)
+    skill_target = skill_dir / "SKILL.md"
     write_text(skill_target, resolve_skill_content(repo_root, skill_source))
     messages.append(f"Installed Codex skill: {skill_target}")
 
-    tool_dir = codex_home / "tools"
     ps1_tool = tool_dir / "codex-stats.ps1"
     sh_tool = tool_dir / "codex-stats.sh"
     write_text(ps1_tool, render_stats_ps1(runner_command))
@@ -248,20 +296,10 @@ def install_integration(
         messages.append("Skipped Codex shim patch. Re-run with --patch-codex if you want `codex stats`.")
         return messages
 
-    backup_dir = codex_home / "integrations" / "codex-observatory" / "backups"
+    backup_dir = integration_dir / "backups"
     patched_any = False
 
-    if os.name == "nt":
-        shim_root = shim_dir or Path(os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming"))) / "npm"
-        targets = [
-            (shim_root / "codex.ps1", patch_powershell_shim),
-            (shim_root / "codex.cmd", patch_cmd_shim),
-            (shim_root / "codex", patch_shell_shim),
-        ]
-    else:
-        found_codex = str(codex_bin) if codex_bin else shutil.which("codex")
-        targets = [(Path(found_codex).resolve(), patch_shell_shim)] if found_codex else []
-
+    targets = launcher_targets(shim_dir=shim_dir, codex_bin=codex_bin)
     for path, patcher in targets:
         if patch_file(path, patcher, backup_dir):
             messages.append(f"Patched Codex shim: {path}")
@@ -276,39 +314,96 @@ def install_integration(
     return messages
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Install Codex Observatory skill, helper tools, and optional `codex stats` launcher patch.")
-    parser.add_argument("--repo-root", help="Path to the codex-observatory repository root.")
-    parser.add_argument("--skill-source", help="Optional path to a SKILL.md file to install instead of the built-in template.")
-    parser.add_argument("--python-bin", help="Python interpreter to embed in generated helper scripts.")
-    parser.add_argument("--runner-bin", help="Executable to embed in generated helper scripts instead of Python.")
+def uninstall_integration(
+    *,
+    codex_home: Path,
+    shim_dir: Path | None = None,
+    codex_bin: Path | None = None,
+) -> list[str]:
+    messages: list[str] = []
+    skill_dir, tool_dir, integration_dir = integration_targets(codex_home=codex_home)
+    backup_dir = integration_dir / "backups"
+
+    restored_any = False
+    for target_path, _patcher in launcher_targets(shim_dir=shim_dir, codex_bin=codex_bin):
+        backup_path = backup_dir / f"{target_path.name}.orig"
+        if not backup_path.exists():
+            continue
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(backup_path, target_path)
+        messages.append(f"Restored Codex shim: {target_path}")
+        restored_any = True
+    if not restored_any:
+        messages.append(f"No Codex launcher backups found under: {backup_dir}")
+
+    ps1_tool = tool_dir / "codex-stats.ps1"
+    sh_tool = tool_dir / "codex-stats.sh"
+    if unlink_if_exists(ps1_tool):
+        messages.append(f"Removed helper tool: {ps1_tool}")
+    if unlink_if_exists(sh_tool):
+        messages.append(f"Removed helper tool: {sh_tool}")
+    prune_empty_dirs(tool_dir, stop_at=codex_home)
+
+    if rmtree_if_exists(skill_dir):
+        messages.append(f"Removed Codex skill: {skill_dir}")
+    prune_empty_dirs(skill_dir.parent, stop_at=codex_home)
+
+    if rmtree_if_exists(integration_dir):
+        messages.append(f"Removed integration state: {integration_dir}")
+    prune_empty_dirs(integration_dir.parent, stop_at=codex_home)
+
+    if len(messages) == 1 and messages[0].startswith("No Codex launcher backups found"):
+        messages.append("No Codex Observatory integration files were removed.")
+    return messages
+
+
+def build_parser(*, action: str) -> argparse.ArgumentParser:
+    description = (
+        "Install Codex Observatory skill, helper tools, and optional `codex stats` launcher patch."
+        if action == "install"
+        else "Remove Codex Observatory integration files and restore the local `codex` launcher from backups when available."
+    )
+    parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--codex-home", default=os.environ.get("CODEX_HOME", "~/.codex"), help="Path to the .codex directory.")
-    parser.add_argument("--patch-codex", action="store_true", help="Patch the local `codex` launcher so `codex stats` works directly.")
     parser.add_argument("--shim-dir", help="Windows-only override for the npm shim directory.")
     parser.add_argument("--codex-bin", help="Unix-only override for the `codex` launcher path.")
+    if action == "install":
+        parser.add_argument("--repo-root", help="Path to the codex-observatory repository root.")
+        parser.add_argument("--skill-source", help="Optional path to a SKILL.md file to install instead of the built-in template.")
+        parser.add_argument("--python-bin", help="Python interpreter to embed in generated helper scripts.")
+        parser.add_argument("--runner-bin", help="Executable to embed in generated helper scripts instead of Python.")
+        parser.add_argument("--patch-codex", action="store_true", help="Patch the local `codex` launcher so `codex stats` works directly.")
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = build_parser()
+def main(argv: list[str] | None = None, *, action: str = "install") -> int:
+    parser = build_parser(action=action)
     args = parser.parse_args(argv)
 
-    repo_root = Path(args.repo_root).expanduser().resolve() if args.repo_root else None
-    skill_source = Path(args.skill_source).expanduser().resolve() if args.skill_source else None
     codex_home = Path(args.codex_home).expanduser().resolve()
     shim_dir = Path(args.shim_dir).expanduser().resolve() if args.shim_dir else None
     codex_bin = Path(args.codex_bin).expanduser().resolve() if args.codex_bin else None
-    runner_command = default_runner_command(runner_bin=args.runner_bin, python_bin=args.python_bin)
+    if action == "install":
+        repo_root = Path(args.repo_root).expanduser().resolve() if args.repo_root else None
+        skill_source = Path(args.skill_source).expanduser().resolve() if args.skill_source else None
+        runner_command = default_runner_command(runner_bin=args.runner_bin, python_bin=args.python_bin)
+        messages = install_integration(
+            codex_home=codex_home,
+            runner_command=runner_command,
+            patch_codex=args.patch_codex,
+            repo_root=repo_root,
+            skill_source=skill_source,
+            shim_dir=shim_dir,
+            codex_bin=codex_bin,
+        )
+    else:
+        messages = uninstall_integration(
+            codex_home=codex_home,
+            shim_dir=shim_dir,
+            codex_bin=codex_bin,
+        )
 
-    for message in install_integration(
-        codex_home=codex_home,
-        runner_command=runner_command,
-        patch_codex=args.patch_codex,
-        repo_root=repo_root,
-        skill_source=skill_source,
-        shim_dir=shim_dir,
-        codex_bin=codex_bin,
-    ):
+    for message in messages:
         print(message)
     return 0
 

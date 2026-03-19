@@ -5,7 +5,7 @@
 ### 1. Check your local Codex usage
 
 ```bash
-codex-observatory
+codex stats
 ```
 
 This works on both Codex layouts:
@@ -16,7 +16,7 @@ This works on both Codex layouts:
 ### 2. Open a shorter dashboard
 
 ```bash
-codex-stats compact
+codex stats compact
 ```
 
 ### 3. Use a native-feeling Codex command
@@ -30,13 +30,14 @@ codex stats
 
 | Command | Description |
 | --- | --- |
-| `codex-observatory` | Default dashboard |
-| `codex-observatory compact` | Compact dashboard |
-| `codex-observatory full` | Full dashboard |
-| `codex-stats` | Alias to the same dashboard |
-| `codex stats` | Patched Codex subcommand |
+| `codex stats` | Recommended dashboard command |
+| `codex stats compact` | Compact dashboard |
+| `codex stats full` | Full dashboard |
+| `codex stats --json` | JSON export |
+| `codex-observatory` | Direct alias to the same dashboard |
+| `codex-stats` | Direct alias to the same dashboard |
 | `npx github:NgoQuocViet2001/codex-observatory compact` | One-shot run |
-| `codex-observatory --json` | JSON output |
+| `codex-observatory uninstall-codex` | Remove integration and restore patched launcher backups |
 
 ## Flags
 
@@ -54,8 +55,17 @@ codex stats
 ## Examples
 
 ```bash
-codex-observatory full --daily-days 14 --monthly-months 12
-codex-stats compact --no-color
+codex stats full --daily-days 14 --monthly-months 12
+codex stats compact --no-color
 codex stats full --top-models 8
-codex-observatory --json
+codex stats --json
+```
+
+## Direct aliases
+
+If you skip patching Codex, or just prefer direct commands, these are equivalent:
+
+```bash
+codex-observatory compact
+codex-stats --json
 ```

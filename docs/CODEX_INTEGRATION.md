@@ -59,8 +59,28 @@ codex stats
 - `~/.codex/tools/codex-stats.sh`
 - a small `stats` dispatch hook inside the local `codex` launcher
 
+## Uninstall
+
+```bash
+codex-observatory uninstall-codex
+```
+
+This removes the Codex Observatory skill, helper tools, and restores the patched `codex` launcher from the backups created during install when those backups exist.
+
+For local repo clones, you can also use:
+
+```powershell
+.\scripts\uninstall-codex.ps1
+```
+
+```bash
+./scripts/uninstall-codex.sh
+```
+
 ## Notes
 
 - only `stats` and `stat` are intercepted
 - other Codex commands still run normally
 - Codex must already be installed before patching
+- `codex stats` is the recommended user-facing command in the docs
+- `codex-observatory` and `codex-stats` remain available as direct aliases

@@ -15,6 +15,7 @@ from codex_observatory.codex_integration import (
     patch_cmd_shim,
     patch_powershell_shim,
     patch_shell_shim,
+    uninstall_integration,
 )
 
 
@@ -74,3 +75,48 @@ class CodexIntegrationTests(unittest.TestCase):
             else:
                 self.assertTrue((backup_dir / "codex.orig").exists())
             self.assertIn("Patched Codex shim", "\n".join(messages))
+
+    def test_uninstall_integration_restores_shims_and_removes_managed_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            repo_root = root / "repo"
+            codex_home = root / ".codex"
+            shim_dir = root / "npm"
+            skill_dir = repo_root / "integrations" / "codex-skill"
+            skill_dir.mkdir(parents=True)
+            (skill_dir / "SKILL.md").write_text("skill", encoding="utf-8")
+            shim_dir.mkdir(parents=True)
+
+            original_ps1 = "#!/usr/bin/env pwsh\n$basedir='x'\n"
+            original_cmd = "@ECHO off\r\nCALL :find_dp0\r\n"
+            original_sh = '#!/bin/sh\nif [ -x "$basedir/node" ]; then\nfi\n'
+            (shim_dir / "codex.ps1").write_text(original_ps1, encoding="utf-8")
+            (shim_dir / "codex.cmd").write_text(original_cmd, encoding="utf-8")
+            (shim_dir / "codex").write_text(original_sh, encoding="utf-8")
+
+            install_integration(
+                codex_home=codex_home,
+                repo_root=repo_root,
+                runner_command=default_runner_command(python_bin="python"),
+                patch_codex=True,
+                shim_dir=shim_dir,
+                codex_bin=(shim_dir / "codex") if sys.platform != "win32" else None,
+            )
+
+            messages = uninstall_integration(
+                codex_home=codex_home,
+                shim_dir=shim_dir,
+                codex_bin=(shim_dir / "codex") if sys.platform != "win32" else None,
+            )
+
+            self.assertFalse((codex_home / "skills" / "codex-observatory").exists())
+            self.assertFalse((codex_home / "tools" / "codex-stats.ps1").exists())
+            self.assertFalse((codex_home / "tools" / "codex-stats.sh").exists())
+            self.assertFalse((codex_home / "integrations" / "codex-observatory").exists())
+            if sys.platform == "win32":
+                self.assertEqual((shim_dir / "codex.ps1").read_text(encoding="utf-8"), original_ps1)
+                self.assertEqual((shim_dir / "codex.cmd").read_text(encoding="utf-8"), original_cmd)
+                self.assertEqual((shim_dir / "codex").read_text(encoding="utf-8"), original_sh)
+            else:
+                self.assertEqual((shim_dir / "codex").read_text(encoding="utf-8"), original_sh)
+            self.assertIn("Removed helper tool", "\n".join(messages))

@@ -5,7 +5,13 @@ const { ensureBinary } = require("../lib/native.cjs");
 const { resolveCodexHome, rewriteNpmToolScripts, syncPromptHistory } = require("../lib/history.cjs");
 
 function shouldSyncPromptHistory(argv) {
-  return argv[0] !== "install-codex" && !argv.includes("--help") && !argv.includes("-h") && !argv.includes("--version");
+  return (
+    argv[0] !== "install-codex" &&
+    argv[0] !== "uninstall-codex" &&
+    !argv.includes("--help") &&
+    !argv.includes("-h") &&
+    !argv.includes("--version")
+  );
 }
 
 function runBinary(binaryPath, argv) {

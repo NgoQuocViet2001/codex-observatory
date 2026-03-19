@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.7 - 2026-03-19
+
+- Simplified the docs around one recommended user-facing flow: install, patch, then use `codex stats`.
+- Added `uninstall-codex` so users can remove Codex Observatory integration files and restore patched Codex launchers from backups with one command.
+- Added uninstall guidance for npm, pip, pipx, and standalone binary installs, while keeping `codex-observatory` and `codex-stats` documented as direct aliases.
+
 ## 1.2.6 - 2026-03-19
 
 - Added a true `history.jsonl` fallback for older Codex installs that do not have a `sessions/` directory, so the dashboard still opens with prompt/session counts instead of failing.
