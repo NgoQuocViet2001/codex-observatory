@@ -16,6 +16,7 @@ from codex_observatory.codex_integration import (
     patch_cmd_shim,
     patch_powershell_shim,
     patch_shell_shim,
+    render_unix_launcher_wrapper,
     uninstall_integration,
 )
 
@@ -237,3 +238,65 @@ class CodexIntegrationTests(unittest.TestCase):
             self.assertTrue(launcher_link.is_symlink())
             self.assertFalse((codex_home / "integrations" / "codex-observatory").exists())
             self.assertIn("Restored legacy Codex launcher target", "\n".join(messages))
+
+    @unittest.skipIf(sys.platform == "win32", "Unix launcher recovery is only relevant on Unix")
+    def test_install_integration_rebuilds_missing_wrapper_backup(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            repo_root = root / "repo"
+            codex_home = root / ".codex"
+            bin_dir = root / "bin"
+            npm_root = root / "lib" / "node_modules"
+            skill_dir = repo_root / "integrations" / "codex-skill"
+            backup_dir = codex_home / "integrations" / "codex-observatory" / "backups"
+            skill_dir.mkdir(parents=True)
+            skill_dir.joinpath("SKILL.md").write_text("skill", encoding="utf-8")
+            bin_dir.mkdir(parents=True)
+            codex_target = npm_root / "@openai" / "codex" / "bin" / "codex.js"
+            codex_target.parent.mkdir(parents=True)
+            codex_target.write_text("#!/usr/bin/env node\nconsole.log('codex');\n", encoding="utf-8")
+            backup_dir.mkdir(parents=True)
+
+            launcher = bin_dir / "codex"
+            launcher.write_text(render_unix_launcher_wrapper(backup_dir / "codex.orig"), encoding="utf-8")
+
+            messages = install_integration(
+                codex_home=codex_home,
+                repo_root=repo_root,
+                runner_command=default_runner_command(python_bin="python"),
+                patch_codex=True,
+                codex_bin=launcher,
+            )
+
+            backup_path = backup_dir / "codex.orig"
+            self.assertTrue(backup_path.is_symlink())
+            self.assertEqual(backup_path.resolve(), codex_target.resolve())
+            self.assertIn("Rebuilt missing Codex launcher backup", "\n".join(messages))
+            self.assertIn("Codex shim already patched", "\n".join(messages))
+
+    @unittest.skipIf(sys.platform == "win32", "Unix launcher recovery is only relevant on Unix")
+    def test_uninstall_integration_rebuilds_missing_wrapper_backup_before_restore(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            codex_home = root / ".codex"
+            bin_dir = root / "bin"
+            npm_root = root / "lib" / "node_modules"
+            backup_dir = codex_home / "integrations" / "codex-observatory" / "backups"
+            bin_dir.mkdir(parents=True)
+            codex_target = npm_root / "@openai" / "codex" / "bin" / "codex.js"
+            codex_target.parent.mkdir(parents=True)
+            codex_target.write_text("#!/usr/bin/env node\nconsole.log('codex');\n", encoding="utf-8")
+            backup_dir.mkdir(parents=True)
+
+            launcher = bin_dir / "codex"
+            launcher.write_text(render_unix_launcher_wrapper(backup_dir / "codex.orig"), encoding="utf-8")
+
+            messages = uninstall_integration(
+                codex_home=codex_home,
+                codex_bin=launcher,
+            )
+
+            self.assertTrue(launcher.is_symlink())
+            self.assertEqual(launcher.resolve(), codex_target.resolve())
+            self.assertFalse((codex_home / "integrations" / "codex-observatory").exists())
+            self.assertIn("Rebuilt missing Codex launcher backup", "\n".join(messages))

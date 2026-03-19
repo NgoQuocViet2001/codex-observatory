@@ -4,6 +4,7 @@ import argparse
 import os
 import shutil
 import stat
+import subprocess
 import sys
 from pathlib import Path
 
@@ -208,6 +209,52 @@ def patch_unix_launcher(path: Path, backup_dir: Path) -> bool:
 
     write_text(path, render_unix_launcher_wrapper(backup_path), executable=True)
     return True
+
+
+def find_upstream_unix_codex_target(unix_launcher: Path) -> Path | None:
+    candidates: list[Path] = []
+
+    npm_bin = shutil.which("npm")
+    if npm_bin:
+        try:
+            result = subprocess.run(
+                [npm_bin, "root", "-g"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except OSError:
+            result = None
+        if result and result.returncode == 0:
+            npm_root = result.stdout.strip()
+            if npm_root:
+                candidates.append(Path(npm_root) / "@openai" / "codex" / "bin" / "codex.js")
+
+    candidates.append(unix_launcher.parent.parent / "lib" / "node_modules" / "@openai" / "codex" / "bin" / "codex.js")
+
+    seen: set[Path] = set()
+    for candidate in candidates:
+        resolved = candidate.expanduser()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        if resolved.exists() and resolved.is_file():
+            return resolved.resolve()
+    return None
+
+
+def rebuild_unix_launcher_backup(unix_launcher: Path, backup_dir: Path) -> Path | None:
+    backup_path = backup_dir / f"{unix_launcher.name}.orig"
+    if path_exists(backup_path):
+        return None
+
+    upstream_target = find_upstream_unix_codex_target(unix_launcher)
+    if upstream_target is None:
+        return None
+
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    backup_path.symlink_to(upstream_target)
+    return backup_path
 
 
 def resolve_symlink_target(path: Path) -> Path | None:
@@ -420,6 +467,9 @@ def install_integration(
         restored_target = restore_legacy_unix_target(unix_launcher, backup_dir) if unix_launcher else None
         if restored_target is not None:
             messages.append(f"Restored legacy Codex launcher target: {restored_target}")
+        rebuilt_backup = rebuild_unix_launcher_backup(unix_launcher, backup_dir) if unix_launcher else None
+        if rebuilt_backup is not None and restored_target is None:
+            messages.append(f"Rebuilt missing Codex launcher backup: {rebuilt_backup}")
         if unix_launcher and patch_unix_launcher(unix_launcher, backup_dir):
             messages.append(f"Patched Codex shim: {unix_launcher}")
             patched_any = True
@@ -441,6 +491,7 @@ def uninstall_integration(
     messages: list[str] = []
     skill_dir, tool_dir, integration_dir = integration_targets(codex_home=codex_home)
     backup_dir = integration_dir / "backups"
+    keep_integration_state = False
 
     restored_any = False
     if os.name == "nt":
@@ -453,6 +504,9 @@ def uninstall_integration(
     else:
         unix_launcher = resolve_unix_launcher(codex_bin=codex_bin)
         if unix_launcher:
+            rebuilt_backup = rebuild_unix_launcher_backup(unix_launcher, backup_dir)
+            if rebuilt_backup is not None:
+                messages.append(f"Rebuilt missing Codex launcher backup: {rebuilt_backup}")
             backup_path = backup_dir / f"{unix_launcher.name}.orig"
             if restore_backup(unix_launcher, backup_path):
                 messages.append(f"Restored Codex shim: {unix_launcher}")
@@ -461,6 +515,11 @@ def uninstall_integration(
             if restored_target is not None:
                 messages.append(f"Restored legacy Codex launcher target: {restored_target}")
                 restored_any = True
+            if path_exists(unix_launcher) and not unix_launcher.is_symlink():
+                current = unix_launcher.read_text(encoding="utf-8", errors="ignore")
+                if UNIX_WRAPPER_MARKER in current:
+                    keep_integration_state = True
+                    messages.append(f"Kept integration state because the Codex launcher is still wrapped: {unix_launcher}")
     if not restored_any:
         messages.append(f"No Codex launcher backups found under: {backup_dir}")
 
@@ -476,9 +535,10 @@ def uninstall_integration(
         messages.append(f"Removed Codex skill: {skill_dir}")
     prune_empty_dirs(skill_dir.parent, stop_at=codex_home)
 
-    if rmtree_if_exists(integration_dir):
+    if not keep_integration_state and rmtree_if_exists(integration_dir):
         messages.append(f"Removed integration state: {integration_dir}")
-    prune_empty_dirs(integration_dir.parent, stop_at=codex_home)
+    if not keep_integration_state:
+        prune_empty_dirs(integration_dir.parent, stop_at=codex_home)
 
     if len(messages) == 1 and messages[0].startswith("No Codex launcher backups found"):
         messages.append("No Codex Observatory integration files were removed.")

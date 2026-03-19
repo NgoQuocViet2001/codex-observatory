@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.11 - 2026-03-20
+
+- Rebuilt missing Unix launcher backups automatically when a wrapped `codex` launcher still exists but `codex.orig` has been deleted.
+- Fixed macOS/Homebrew recovery where `codex` could break with `No such file or directory` after uninstalling or upgrading from older wrapper-based patches.
+- Added Unix regression tests that cover reinstall and uninstall flows with a missing `codex.orig` backup.
+
 ## 1.2.10 - 2026-03-19
 
 - Repaired upgrades from older macOS and Unix installs that had patched the resolved `codex.js` target instead of the launcher symlink.
