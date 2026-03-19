@@ -129,3 +129,4 @@ codex stats
 - `codex stats` requires Codex to already exist on the machine.
 - `codex-observatory` works even without patching Codex.
 - `npm` installs download the native binary on first run.
+- Newer Codex installs may not have `~/.codex/history.jsonl`; `codex-observatory` now reconstructs prompt history from `sessions/**/*.jsonl` automatically.

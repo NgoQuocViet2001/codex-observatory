@@ -8,6 +8,11 @@
 codex-observatory
 ```
 
+This works on both Codex layouts:
+
+- older installs with `~/.codex/history.jsonl`
+- newer installs that only keep `~/.codex/sessions/**/*.jsonl`
+
 ### 2. Open a shorter dashboard
 
 ```bash

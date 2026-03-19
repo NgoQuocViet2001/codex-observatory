@@ -11,10 +11,10 @@ Local stats dashboard for Codex. Read usage directly from machine logs and inspe
 
 Codex writes rich local logs, but it does not ship a built-in `codex stats` command.
 
-Codex Observatory fills that gap with a local-first dashboard built from:
+Codex Observatory fills that gap with a local-first dashboard built from Codex prompt/session logs, including:
 
-- `~/.codex/history.jsonl`
-- `~/.codex/sessions/**/*.jsonl`
+- `~/.codex/history.jsonl` when the Codex install still writes it
+- `~/.codex/sessions/**/*.jsonl` on newer Codex installs that only keep session logs
 
 This is especially useful when:
 
@@ -167,6 +167,7 @@ codex stats
 - `codex-observatory` works without patching.
 - `codex-stats` is available for `npm` and `pip` installs.
 - `npm` installs download the matching native binary on first run.
+- If `history.jsonl` is missing, `codex-observatory` rebuilds prompt history from session logs instead of failing.
 
 ## Docs
 

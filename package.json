@@ -15,7 +15,7 @@
     "lib/**/*"
   ],
   "scripts": {
-    "test": "node --test npm/tests/platform.test.cjs npm/tests/native.test.cjs"
+    "test": "node --test npm/tests/platform.test.cjs npm/tests/native.test.cjs npm/tests/history.test.cjs"
   },
   "engines": {
     "node": ">=18"

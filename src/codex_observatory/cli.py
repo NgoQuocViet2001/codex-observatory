@@ -257,12 +257,16 @@ def from_unix_seconds(value: int | str) -> datetime:
     return datetime.fromtimestamp(int(value), tz=timezone.utc).astimezone().replace(tzinfo=None)
 
 
+def has_supported_codex_data(path: Path) -> bool:
+    return (path / "history.jsonl").exists() or (path / "session_index.jsonl").exists() or (path / "sessions").exists()
+
+
 def resolve_codex_home(path_value: str | None) -> Path:
     candidate = Path(path_value or "~/.codex").expanduser()
-    if (candidate / "history.jsonl").exists() and (candidate / "sessions").exists():
+    if has_supported_codex_data(candidate):
         return candidate
     nested = candidate / ".codex"
-    if (nested / "history.jsonl").exists() and (nested / "sessions").exists():
+    if has_supported_codex_data(nested):
         return nested
     return candidate
 
@@ -300,6 +304,112 @@ def load_history(codex_home: Path) -> tuple[list[PromptEvent], datetime | None]:
         if latest_prompt_time is None or timestamp > latest_prompt_time:
             latest_prompt_time = timestamp
     return events, latest_prompt_time
+
+
+def parse_timestamp_or_fallback(raw_value: object, fallback: datetime) -> datetime:
+    if raw_value:
+        try:
+            return parse_local_time(str(raw_value))
+        except Exception:
+            pass
+    return fallback
+
+
+def response_item_user_text(payload: dict) -> str:
+    parts: list[str] = []
+    for part in payload.get("content") or []:
+        if not isinstance(part, dict):
+            continue
+        text = part.get("text")
+        if isinstance(text, str) and text.strip():
+            parts.append(text)
+    return "\n".join(parts).strip()
+
+
+def is_environment_context_prompt(text: str) -> bool:
+    return text.lstrip().startswith("<environment_context>")
+
+
+def load_history_from_sessions(codex_home: Path) -> tuple[list[PromptEvent], datetime | None]:
+    sessions_root = codex_home / "sessions"
+    if not sessions_root.exists():
+        return [], None
+
+    events: list[PromptEvent] = []
+    latest_prompt_time: datetime | None = None
+
+    for session_file in sorted(sessions_root.rglob("*.jsonl")):
+        session_id = session_file.stem
+        fallback_time = datetime.fromtimestamp(session_file.stat().st_mtime).replace(microsecond=0)
+        explicit_prompt_events: list[PromptEvent] = []
+        fallback_prompt_events: list[PromptEvent] = []
+
+        for line in read_jsonl_lines(session_file):
+            if not line.strip():
+                continue
+            try:
+                item = json.loads(line)
+            except Exception:
+                continue
+
+            payload = item.get("payload") or {}
+            if item.get("type") == "session_meta":
+                session_id = str(payload.get("id") or session_id)
+                continue
+
+            timestamp = parse_timestamp_or_fallback(item.get("timestamp"), fallback_time)
+
+            if item.get("type") == "event_msg" and payload.get("type") == "user_message":
+                message = str(payload.get("message") or "").strip()
+                if not message:
+                    continue
+                explicit_prompt_events.append(
+                    PromptEvent(
+                        timestamp=timestamp,
+                        session_id=session_id,
+                        date_key=timestamp.strftime("%Y-%m-%d"),
+                        month_key=timestamp.strftime("%Y-%m"),
+                    )
+                )
+                continue
+
+            if item.get("type") == "response_item" and payload.get("type") == "message" and payload.get("role") == "user":
+                prompt_text = response_item_user_text(payload)
+                if not prompt_text or is_environment_context_prompt(prompt_text):
+                    continue
+                fallback_prompt_events.append(
+                    PromptEvent(
+                        timestamp=timestamp,
+                        session_id=session_id,
+                        date_key=timestamp.strftime("%Y-%m-%d"),
+                        month_key=timestamp.strftime("%Y-%m"),
+                    )
+                )
+
+        session_events = explicit_prompt_events or fallback_prompt_events
+        events.extend(session_events)
+        if session_events:
+            session_latest = max(event.timestamp for event in session_events)
+            if latest_prompt_time is None or session_latest > latest_prompt_time:
+                latest_prompt_time = session_latest
+
+    events.sort(key=lambda event: (event.timestamp, event.session_id))
+    return events, latest_prompt_time
+
+
+def load_prompt_history(
+    codex_home: Path,
+    *,
+    status: Callable[[str], None] | None = None,
+) -> tuple[list[PromptEvent], datetime | None]:
+    history_path = codex_home / "history.jsonl"
+    if history_path.exists():
+        if status:
+            status("Reading prompt history...")
+        return load_history(codex_home)
+    if status:
+        status("Reconstructing prompt history from session logs...")
+    return load_history_from_sessions(codex_home)
 
 
 def load_sessions(codex_home: Path) -> tuple[list[TurnEvent], list[TokenEvent], datetime | None, str]:
@@ -436,9 +546,7 @@ def build_report(
     top_models: int,
     status: Callable[[str], None] | None = None,
 ) -> Report:
-    if status:
-        status("Reading prompt history...")
-    prompt_events, latest_prompt_time = load_history(codex_home)
+    prompt_events, latest_prompt_time = load_prompt_history(codex_home, status=status)
     if status:
         status("Scanning session logs...")
     turn_events, token_events, latest_token_time, latest_model = load_sessions(codex_home)
@@ -748,7 +856,7 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
     lines.append(top)
     add_summary(style.paint("CODEX STATS", "title"))
     lines.append(mid)
-    add_summary(style.paint("Live local usage from ~/.codex/history.jsonl + ~/.codex/sessions/**/*.jsonl", "muted"))
+    add_summary(style.paint("Live local usage from Codex history/session logs under ~/.codex", "muted"))
     add_summary(
         style.paint(
             f"Updated: {report.generated_at:%Y-%m-%d %H:%M:%S} | "

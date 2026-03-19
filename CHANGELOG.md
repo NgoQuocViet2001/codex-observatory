@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Fixed the missing `history.jsonl` crash on newer Codex installs by reconstructing prompt history from `sessions/**/*.jsonl` when needed.
+- Taught the npm wrapper to backfill a synthetic `~/.codex/history.jsonl` for current native releases and to refresh `codex stats` helper scripts so npm installs keep going through the compatibility wrapper.
+- Updated tests and install docs for Codex homes that only contain session logs.
+
 ## 1.2.4 - 2026-03-19
 
 - Synced the Python package version with the npm/native release version so wheel, sdist, npm, and binary assets all publish the same release number.

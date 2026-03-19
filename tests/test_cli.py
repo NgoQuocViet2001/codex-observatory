@@ -18,7 +18,7 @@ def unix_seconds(value: str) -> int:
 
 
 class CodexObservatoryTests(unittest.TestCase):
-    def make_fixture(self) -> Path:
+    def make_fixture(self, *, include_history: bool = True) -> Path:
         temp_dir = Path(tempfile.mkdtemp())
         codex_home = temp_dir / ".codex"
         sessions_dir = codex_home / "sessions" / "2026" / "03" / "19"
@@ -29,13 +29,43 @@ class CodexObservatoryTests(unittest.TestCase):
             {"session_id": "session-a", "ts": unix_seconds("2026-03-18T01:05:00")},
             {"session_id": "session-b", "ts": unix_seconds("2026-03-19T01:00:00")},
         ]
-        (codex_home / "history.jsonl").write_text(
-            "\n".join(json.dumps(row) for row in history_rows) + "\n",
-            encoding="utf-8",
-        )
+        if include_history:
+            (codex_home / "history.jsonl").write_text(
+                "\n".join(json.dumps(row) for row in history_rows) + "\n",
+                encoding="utf-8",
+            )
 
         session_a = [
             {"timestamp": "2026-03-18T01:00:00Z", "type": "session_meta", "payload": {"id": "session-a"}},
+            {
+                "timestamp": "2026-03-18T00:59:30Z",
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "<environment_context>\n  <cwd>D:\\fixture</cwd>\n</environment_context>"}],
+                },
+            },
+            {
+                "timestamp": "2026-03-18T01:00:00Z",
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "prompt one"}],
+                },
+            },
+            {"timestamp": "2026-03-18T01:00:00Z", "type": "event_msg", "payload": {"type": "user_message", "message": "prompt one"}},
+            {
+                "timestamp": "2026-03-18T01:05:00Z",
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "prompt two"}],
+                },
+            },
+            {"timestamp": "2026-03-18T01:05:00Z", "type": "event_msg", "payload": {"type": "user_message", "message": "prompt two"}},
             {"timestamp": "2026-03-18T01:01:00Z", "type": "turn_context", "payload": {"model": "gpt-5.4"}},
             {
                 "timestamp": "2026-03-18T01:02:00Z",
@@ -73,6 +103,25 @@ class CodexObservatoryTests(unittest.TestCase):
 
         session_b = [
             {"timestamp": "2026-03-19T01:00:00Z", "type": "session_meta", "payload": {"id": "session-b"}},
+            {
+                "timestamp": "2026-03-19T00:59:45Z",
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "<environment_context>\n  <cwd>D:\\fixture</cwd>\n</environment_context>"}],
+                },
+            },
+            {
+                "timestamp": "2026-03-19T01:00:00Z",
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "prompt three"}],
+                },
+            },
+            {"timestamp": "2026-03-19T01:00:00Z", "type": "event_msg", "payload": {"type": "user_message", "message": "prompt three"}},
             {"timestamp": "2026-03-19T01:01:00Z", "type": "turn_context", "payload": {"model": "gpt-5.3-codex"}},
             {
                 "timestamp": "2026-03-19T01:02:00Z",
@@ -120,6 +169,24 @@ class CodexObservatoryTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["all_time"]["sessions"], 2)
         self.assertEqual(payload["summary"]["latest_model"], "gpt-5.3-codex")
         self.assertEqual(len(payload["models_30d"]), 2)
+
+    def test_json_summary_works_without_history_file_by_parsing_session_logs(self) -> None:
+        codex_home = self.make_fixture(include_history=False)
+        result = self.run_cli("--json", "--codex-home", str(codex_home), "--now", "2026-03-19T10:00:00")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["summary"]["today"]["prompts"], 1)
+        self.assertEqual(payload["summary"]["all_time"]["prompts"], 3)
+        self.assertEqual(payload["summary"]["all_time"]["sessions"], 2)
+        self.assertEqual(payload["summary"]["latest_model"], "gpt-5.3-codex")
+
+    def test_parent_path_resolves_nested_session_only_codex_home(self) -> None:
+        codex_home = self.make_fixture(include_history=False)
+        result = self.run_cli("--json", "--codex-home", str(codex_home.parent), "--now", "2026-03-19T10:00:00")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["summary"]["all_time"]["prompts"], 3)
+        self.assertTrue(payload["codex_home"].endswith(".codex"))
 
     def test_text_dashboard_renders_core_sections(self) -> None:
         codex_home = self.make_fixture()
