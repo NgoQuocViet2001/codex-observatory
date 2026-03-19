@@ -1,242 +1,130 @@
 # Install Guide
 
-`codex-observatory` exists because Codex does not ship a built-in stats/dashboard command today. Pick the install path that matches what you already have on your machine.
+## What you get
 
-## Short answer
-
-If you stop after installing the app itself, you get a standalone dashboard:
-
-```bash
-codex-observatory
-```
-
-If you install through `npm` or `pip`, you also get:
-
-```bash
-codex-stats
-```
-
-If you specifically want this:
-
-```bash
-codex stats
-```
-
-you must run one extra step after install:
-
-```bash
-codex-observatory install-codex --patch-codex
-```
-
-The repo scripts:
-
-```bash
-./scripts/install-codex.sh
-./scripts/install-codex.sh --patch-codex
-```
-
-and:
-
-```powershell
-.\scripts\install-codex.ps1
-.\scripts\install-codex.ps1 -PatchCodex
-```
-
-are mainly for people who cloned this repository locally.
-
-## Command matrix
-
-| Install method | Works immediately | Gives `codex-stats` | Gives `codex stats` |
-| --- | --- | --- | --- |
-| Standalone binary | `codex-observatory` | No | No |
-| `npm install -g ...` | `codex-observatory` | Yes | No |
-| `pip install ...` / `pipx install ...` | `codex-observatory` | Yes | No |
-| Any of the above, then `install-codex --patch-codex` | `codex-observatory` | Depends on install method | Yes |
+| Command | Available after |
+| --- | --- |
+| `codex-observatory` | binary, `npm`, `pip`, `pipx` |
+| `codex-stats` | `npm`, `pip`, `pipx` |
+| `codex stats` | run `install-codex --patch-codex` |
 
 ## Windows
 
-### Easiest: one binary, no Python
+### Node.js path
 
 ```powershell
-Invoke-WebRequest "https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.2/codex-observatory-windows-x64.exe" -OutFile "$HOME\\codex-observatory.exe"
+npm install -g github:NgoQuocViet2001/codex-observatory
+codex-stats
+codex-observatory install-codex --patch-codex
+codex stats
+```
+
+One-shot:
+
+```powershell
+npx github:NgoQuocViet2001/codex-observatory compact
+```
+
+### Binary path
+
+```powershell
+Invoke-WebRequest "https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-windows-x64.exe" -OutFile "$HOME\\codex-observatory.exe"
 & "$HOME\\codex-observatory.exe"
-```
-
-To make `codex stats` work:
-
-```powershell
 & "$HOME\\codex-observatory.exe" install-codex --patch-codex
-codex stats
-```
-
-### If you already have Node.js
-
-```powershell
-npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.2
-codex-observatory
-codex-stats
-```
-
-To make `codex stats` work:
-
-```powershell
-codex-observatory install-codex --patch-codex
-codex stats
-```
-
-One-shot without global install:
-
-```powershell
-npx github:NgoQuocViet2001/codex-observatory#v1.2.2 compact
-```
-
-### If you already have Python
-
-```powershell
-python -m pip install git+https://github.com/NgoQuocViet2001/codex-observatory.git
-codex-observatory
-codex-stats
-codex-observatory install-codex --patch-codex
 codex stats
 ```
 
 ## macOS
 
-### Easiest: one binary, no Python
+### Node.js path
+
+```bash
+npm install -g github:NgoQuocViet2001/codex-observatory
+codex-stats
+codex-observatory install-codex --patch-codex
+codex stats
+```
+
+One-shot:
+
+```bash
+npx github:NgoQuocViet2001/codex-observatory compact
+```
+
+### Binary path
 
 Apple Silicon:
 
 ```bash
-curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.2/codex-observatory-macos-arm64 -o ./codex-observatory
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-macos-arm64 -o ./codex-observatory
 chmod +x ./codex-observatory
 ./codex-observatory
+./codex-observatory install-codex --patch-codex
+codex stats
 ```
 
 Intel:
 
 ```bash
-curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.2/codex-observatory-macos-x64 -o ./codex-observatory
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-macos-x64 -o ./codex-observatory
 chmod +x ./codex-observatory
 ./codex-observatory
-```
-
-If macOS blocks the binary the first time:
-
-```bash
-xattr -d com.apple.quarantine ./codex-observatory
-```
-
-To make `codex stats` work:
-
-```bash
 ./codex-observatory install-codex --patch-codex
-codex stats
-```
-
-### If you already have Node.js
-
-```bash
-npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.2
-codex-observatory
-codex-stats
-```
-
-To make `codex stats` work:
-
-```bash
-codex-observatory install-codex --patch-codex
-codex stats
-```
-
-One-shot without global install:
-
-```bash
-npx github:NgoQuocViet2001/codex-observatory#v1.2.2 full
-```
-
-### If you already have Python
-
-```bash
-python3 -m pip install git+https://github.com/NgoQuocViet2001/codex-observatory.git
-codex-observatory
-codex-stats
-codex-observatory install-codex --patch-codex
 codex stats
 ```
 
 ## Ubuntu / Linux
 
-### Easiest: one binary, no Python
+### Node.js path
 
 ```bash
-curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.2/codex-observatory-linux-x64 -o ./codex-observatory
-chmod +x ./codex-observatory
-./codex-observatory
+npm install -g github:NgoQuocViet2001/codex-observatory
+codex-stats
+codex-observatory install-codex --patch-codex
+codex stats
 ```
 
-To make `codex stats` work:
+One-shot:
 
 ```bash
+npx github:NgoQuocViet2001/codex-observatory compact
+```
+
+### Binary path
+
+```bash
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-linux-x64 -o ./codex-observatory
+chmod +x ./codex-observatory
+./codex-observatory
 ./codex-observatory install-codex --patch-codex
 codex stats
 ```
 
-### If you already have Node.js
+## Python / pipx
 
 ```bash
-npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.2
-codex-observatory
-codex-stats
-```
-
-To make `codex stats` work:
-
-```bash
-codex-observatory install-codex --patch-codex
-codex stats
-```
-
-One-shot without global install:
-
-```bash
-npx github:NgoQuocViet2001/codex-observatory#v1.2.2 compact
-```
-
-### If you already have Python
-
-```bash
-python3 -m pip install git+https://github.com/NgoQuocViet2001/codex-observatory.git
-codex-observatory
+pipx install git+https://github.com/NgoQuocViet2001/codex-observatory.git
 codex-stats
 codex-observatory install-codex --patch-codex
 codex stats
 ```
 
-## Make `codex stats` work directly
+## Local repo clone
 
-If you installed from a binary, `npm`, or `pip`, run:
-
-```bash
-codex-observatory install-codex --patch-codex
-codex stats
-```
-
-If you cloned this repo locally and want a one-step script:
+Use this only if you cloned the repository:
 
 ```powershell
 .\scripts\install-codex.ps1 -PatchCodex
+codex stats
 ```
 
 ```bash
 ./scripts/install-codex.sh --patch-codex
+codex stats
 ```
 
-If you are using a downloaded standalone binary that is not on `PATH`, replace `codex-observatory` with that binary path:
+## Notes
 
-```powershell
-& "$HOME\codex-observatory.exe" install-codex --patch-codex
-```
-
-```bash
-./codex-observatory install-codex --patch-codex
-```
+- `codex stats` patches the local `codex` launcher.
+- `codex stats` requires Codex to already exist on the machine.
+- `codex-observatory` works even without patching Codex.

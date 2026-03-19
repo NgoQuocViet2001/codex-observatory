@@ -1,263 +1,175 @@
 # Codex Observatory
 
-Production-style local observability for Codex. Track prompts, sessions, token flow, cache share, model mix, streaks, heatmaps, and recent activity directly from local Codex logs.
+Local stats dashboard for Codex. Read usage directly from machine logs and inspect prompts, tokens, sessions, streaks, model mix, and trends.
 
 [![CI](https://github.com/NgoQuocViet2001/codex-observatory/actions/workflows/ci.yml/badge.svg)](https://github.com/NgoQuocViet2001/codex-observatory/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/NgoQuocViet2001/codex-observatory)](https://github.com/NgoQuocViet2001/codex-observatory/releases)
-[![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)](https://www.python.org/)
 [![Node](https://img.shields.io/badge/node-18%2B-5FA04E)](https://nodejs.org/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)](https://www.python.org/)
 
-## Why this exists
+## Why
 
-Codex already writes rich local usage logs, but it does not ship a built-in `codex stats` command, dashboard, or token analytics view. `codex-observatory` exists to close that gap and turn raw JSONL telemetry into a production-style local dashboard.
+Codex writes rich local logs, but it does not ship a built-in `codex stats` command.
 
-It reads:
+Codex Observatory fills that gap with a local-first dashboard built from:
 
 - `~/.codex/history.jsonl`
 - `~/.codex/sessions/**/*.jsonl`
 
-## What you get after install
+This is especially useful when:
 
-`codex-observatory` is a standalone CLI first.
+- one Codex account is shared by multiple people
+- one machine uses multiple Codex accounts
+- you want machine-level usage, not account-level usage
 
-It does **not** automatically turn into `codex stats` unless you run the optional Codex integration patch.
+## Quick Answer
 
-| What you want | What you install | Command that works right away | Extra step for `codex stats` |
-| --- | --- | --- | --- |
-| Standalone dashboard with no patching | Binary, `npm`, or `pip` | `codex-observatory` | Yes |
-| Short standalone alias | `npm` or `pip` | `codex-stats` | Yes |
-| Native-feeling Codex subcommand | Any install method | `codex-observatory` first | Run `install-codex --patch-codex` |
+There are 3 command styles:
 
-If you only do this:
+| Command | What it is |
+| --- | --- |
+| `codex-observatory` | Main standalone CLI |
+| `codex-stats` | Short alias from `npm` and `pip` installs |
+| `codex stats` | Optional native-feeling Codex subcommand after patching |
 
-```bash
-codex-observatory
-```
-
-then you have the standalone dashboard only.
-
-If you want this:
+Yes, this flow works:
 
 ```bash
+npm install -g github:NgoQuocViet2001/codex-observatory
+codex-stats
+codex-observatory install-codex --patch-codex
 codex stats
 ```
 
-you must run the extra integration step:
+`codex stats` only exists after the patch step.
+
+One-shot without global install:
 
 ```bash
-codex-observatory install-codex --patch-codex
+npx github:NgoQuocViet2001/codex-observatory compact
 ```
 
-## Highlights
-
-- Live local metrics without calling any remote API.
-- Smart terminal dashboard with `compact`, `normal`, and `full` views.
-- Model breakdowns for both 30-day and all-time windows.
-- Bordered tables, heatmap, sparkline, load bars, and cache-share summaries.
-- JSON output for automation or scripting.
-- Works on Windows, macOS, and Linux with Python 3.10+.
-- Ships prebuilt binaries for Windows x64, macOS Intel, macOS Apple Silicon, and Linux x64.
-- Can be installed with `npm` / `npx` if you do not want to install Python first.
-- Optional shim patch so `codex stats` works as a native-feeling subcommand.
-
-## Install
-
-Choose the outcome you want:
-
-- `codex-observatory`: standalone dashboard command
-- `codex-stats`: short standalone alias, available for `npm` and `pip` installs
-- `codex stats`: built-in style Codex subcommand, available only after the patch step
+## Quickstart
 
 ### Windows
 
-No Python, direct binary:
+If you already have Node.js:
 
 ```powershell
-Invoke-WebRequest "https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.2/codex-observatory-windows-x64.exe" -OutFile "$HOME\\codex-observatory.exe"
-& "$HOME\\codex-observatory.exe"
-```
-
-Enable `codex stats` after the binary install:
-
-```powershell
-& "$HOME\\codex-observatory.exe" install-codex --patch-codex
+npm install -g github:NgoQuocViet2001/codex-observatory
+codex-stats
+codex-observatory install-codex --patch-codex
 codex stats
 ```
 
-Node / npm:
+No Node, use the binary:
 
 ```powershell
-npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.2
-codex-observatory
-codex-stats
-```
-
-Enable `codex stats` after the npm install:
-
-```powershell
-codex-observatory install-codex --patch-codex
+Invoke-WebRequest "https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-windows-x64.exe" -OutFile "$HOME\\codex-observatory.exe"
+& "$HOME\\codex-observatory.exe"
+& "$HOME\\codex-observatory.exe" install-codex --patch-codex
 codex stats
 ```
 
 ### macOS
 
-No Python, direct binary:
+If you already have Node.js:
 
 ```bash
-curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.2/codex-observatory-macos-arm64 -o ./codex-observatory
-chmod +x ./codex-observatory
-./codex-observatory
+npm install -g github:NgoQuocViet2001/codex-observatory
+codex-stats
+codex-observatory install-codex --patch-codex
+codex stats
 ```
 
-If you are on Intel Mac, download `codex-observatory-macos-x64` instead.
+No Node, use the binary:
 
-Enable `codex stats` after the binary install:
+Apple Silicon:
 
 ```bash
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-macos-arm64 -o ./codex-observatory
+chmod +x ./codex-observatory
+./codex-observatory
 ./codex-observatory install-codex --patch-codex
 codex stats
 ```
 
-Node / npm:
+Intel:
 
 ```bash
-npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.2
-codex-observatory
-codex-stats
-```
-
-Enable `codex stats` after the npm install:
-
-```bash
-codex-observatory install-codex --patch-codex
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-macos-x64 -o ./codex-observatory
+chmod +x ./codex-observatory
+./codex-observatory
+./codex-observatory install-codex --patch-codex
 codex stats
 ```
 
 ### Ubuntu / Linux
 
-No Python, direct binary:
+If you already have Node.js:
 
 ```bash
-curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/download/v1.2.2/codex-observatory-linux-x64 -o ./codex-observatory
+npm install -g github:NgoQuocViet2001/codex-observatory
+codex-stats
+codex-observatory install-codex --patch-codex
+codex stats
+```
+
+No Node, use the binary:
+
+```bash
+curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-linux-x64 -o ./codex-observatory
 chmod +x ./codex-observatory
 ./codex-observatory
-```
-
-Enable `codex stats` after the binary install:
-
-```bash
 ./codex-observatory install-codex --patch-codex
 codex stats
 ```
 
-Node / npm:
+## Common Cases
 
-```bash
-npm install -g github:NgoQuocViet2001/codex-observatory#v1.2.2
-codex-observatory
-codex-stats
-```
+| Case | Command |
+| --- | --- |
+| Open the default dashboard | `codex-observatory` |
+| Open a short dashboard | `codex-stats compact` |
+| Add a native Codex command | `codex-observatory install-codex --patch-codex` |
 
-Enable `codex stats` after the npm install:
+## Commands
 
-```bash
-codex-observatory install-codex --patch-codex
-codex stats
-```
+| Command | Description |
+| --- | --- |
+| `codex-observatory` | Default dashboard |
+| `codex-observatory compact` | Short view |
+| `codex-observatory full` | Detailed view |
+| `codex-stats` | Alias to the same dashboard |
+| `codex stats` | Codex-native style command after patch |
+| `npx github:NgoQuocViet2001/codex-observatory compact` | One-shot run without global install |
+| `codex-observatory --json` | JSON output for scripts |
+| `codex-observatory install-codex --patch-codex` | Install Codex helper assets and patch `codex` launcher |
 
-### Python / pipx
+## Flags
 
-```bash
-pipx install git+https://github.com/NgoQuocViet2001/codex-observatory.git
-codex-observatory
-codex-stats
-codex-observatory install-codex --patch-codex
-codex stats
-```
+| Flag | Description |
+| --- | --- |
+| `compact` | Smaller dashboard |
+| `full` | Expanded dashboard |
+| `--no-color` | Disable ANSI colors |
+| `--json` | Emit JSON |
+| `--daily-days N` | Daily table window |
+| `--monthly-months N` | Monthly table window |
+| `--heatmap-weeks N` | Heatmap width |
+| `--top-models N` | Limit model rows |
+| `--width N` | Override terminal width |
+| `--codex-home PATH` | Read logs from another Codex home |
 
-### Option 2: install from a local clone
+## Notes
 
-```bash
-git clone git@git-personal:NgoQuocViet2001/codex-observatory.git
-cd codex-observatory
-python -m pip install -e .
-```
-
-If your Python scripts directory is not on `PATH`, use:
-
-```bash
-python -m codex_observatory
-```
-
-## Core commands
-
-```bash
-codex-observatory
-codex-observatory compact
-codex-observatory full --daily-days 14 --monthly-months 12
-codex-stats compact --no-color
-codex-observatory install-codex --patch-codex
-codex-observatory --json
-python -m codex_observatory full --no-color
-```
-
-## Optional Codex integration
-
-Important:
-
-- `codex-observatory` and `codex-stats` are standalone commands
-- `codex stats` is a separate, optional integration step
-- `./scripts/install-codex.ps1` and `./scripts/install-codex.sh` are mainly for people who cloned this repo locally
-- if you installed from a binary, `npm`, or `pip`, prefer `codex-observatory install-codex --patch-codex`
-
-### PowerShell
-
-```powershell
-.\scripts\install-codex.ps1
-.\scripts\install-codex.ps1 -PatchCodex
-```
-
-### Bash / zsh
-
-```bash
-./scripts/install-codex.sh
-./scripts/install-codex.sh --patch-codex
-```
-
-The default script install adds the local package, helper scripts, and a Codex skill into `~/.codex/skills/codex-observatory`.
-
-It does **not** enable `codex stats` yet.
-
-The optional patch mode also injects a small dispatch hook into the local `codex` launcher so these work directly:
-
-```bash
-codex stats
-codex stats compact
-```
-
-Why patch the launcher? Because Codex does not have built-in stats today, and most people will naturally try `codex stats` before they remember a separate binary name.
-
-If you installed the standalone binary instead of a global command, run the same step with that binary path:
-
-```bash
-./codex-observatory install-codex --patch-codex
-```
+- `codex stats` requires Codex to already be installed on the machine.
+- `codex-observatory` works without patching.
+- `codex-stats` is available for `npm` and `pip` installs.
 
 ## Docs
 
-- [Install guide](./docs/INSTALL.md)
-- [Usage guide](./docs/USAGE.md)
-- [Codex integration](./docs/CODEX_INTEGRATION.md)
+- [Install Guide](./docs/INSTALL.md)
+- [Usage Guide](./docs/USAGE.md)
+- [Codex Integration](./docs/CODEX_INTEGRATION.md)
 - [Changelog](./CHANGELOG.md)
-
-## Release flow
-
-```bash
-python -m unittest discover -s tests -v
-npm test
-python -m pip install build
-git tag v1.2.2
-git push origin main --tags
-```
-
-Pushing a `v*` tag triggers GitHub Actions to build the Python package plus standalone binaries for Windows, macOS, and Linux, then publish them as GitHub release assets.
