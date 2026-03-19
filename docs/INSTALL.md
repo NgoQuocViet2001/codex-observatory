@@ -1,160 +1,64 @@
 # Install Guide
 
-## What you get
+## Supported Platforms
 
-| Command | Available after |
-| --- | --- |
-| `codex stats` | run `install-codex --patch-codex` |
-| `codex-observatory` | binary, `npm`, `pip`, `pipx` |
-| `codex-stats` | `npm`, `pip`, `pipx` |
+- Windows x64 and arm64
+- macOS Intel and Apple Silicon
+- Linux x64 and arm64
 
-## Windows
+## Requirements
 
-### Node.js path
+- Node.js 18+
+- Codex already installed on the machine
 
-```powershell
-npm install -g github:NgoQuocViet2001/codex-observatory
+## Install
+
+The same install flow works across Windows, macOS, and Linux:
+
+```bash
+npm install -g codex-observatory
+```
+
+After install, the package auto-patches the local `codex` launcher so these commands should work immediately:
+
+```bash
+codex stats
+codex stats compact
+codex stats full
+codex stats --json
+```
+
+## Repair
+
+If the npm install ran with scripts disabled, or if Codex was installed after Codex Observatory, repair the integration with:
+
+```bash
 codex-observatory install-codex --patch-codex
-codex stats
 ```
 
-One-shot:
+## Direct Aliases
 
-```powershell
-npx github:NgoQuocViet2001/codex-observatory compact
-```
-
-### Binary path
-
-```powershell
-Invoke-WebRequest "https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-windows-x64.exe" -OutFile "$HOME\\codex-observatory.exe"
-& "$HOME\\codex-observatory.exe" install-codex --patch-codex
-codex stats
-```
-
-Windows ARM64:
-
-```powershell
-Invoke-WebRequest "https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-windows-arm64.exe" -OutFile "$HOME\\codex-observatory.exe"
-& "$HOME\\codex-observatory.exe" install-codex --patch-codex
-codex stats
-```
-
-## macOS
-
-### Node.js path
+These are still valid direct entrypoints:
 
 ```bash
-npm install -g github:NgoQuocViet2001/codex-observatory
-codex-observatory install-codex --patch-codex
-codex stats
+codex-observatory
+codex-stats
 ```
 
-One-shot:
+## Clean Uninstall
 
-```bash
-npx github:NgoQuocViet2001/codex-observatory compact
-```
-
-### Binary path
-
-Apple Silicon:
-
-```bash
-curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-macos-arm64 -o ./codex-observatory
-chmod +x ./codex-observatory
-./codex-observatory install-codex --patch-codex
-codex stats
-```
-
-Intel:
-
-```bash
-curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-macos-x64 -o ./codex-observatory
-chmod +x ./codex-observatory
-./codex-observatory install-codex --patch-codex
-codex stats
-```
-
-## Ubuntu / Linux
-
-### Node.js path
-
-```bash
-npm install -g github:NgoQuocViet2001/codex-observatory
-codex-observatory install-codex --patch-codex
-codex stats
-```
-
-One-shot:
-
-```bash
-npx github:NgoQuocViet2001/codex-observatory compact
-```
-
-### Binary path
-
-```bash
-curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-linux-x64 -o ./codex-observatory
-chmod +x ./codex-observatory
-./codex-observatory install-codex --patch-codex
-codex stats
-```
-
-Linux ARM64:
-
-```bash
-curl -L https://github.com/NgoQuocViet2001/codex-observatory/releases/latest/download/codex-observatory-linux-arm64 -o ./codex-observatory
-chmod +x ./codex-observatory
-./codex-observatory install-codex --patch-codex
-codex stats
-```
-
-## Python / pipx
-
-```bash
-pipx install git+https://github.com/NgoQuocViet2001/codex-observatory.git
-codex-observatory install-codex --patch-codex
-codex stats
-```
-
-## Local repo clone
-
-Use this only if you cloned the repository:
-
-```powershell
-.\scripts\install-codex.ps1 -PatchCodex
-codex stats
-```
-
-```bash
-./scripts/install-codex.sh --patch-codex
-codex stats
-```
-
-## Notes
-
-- `codex stats` is the recommended command after setup.
-- `codex stats` requires Codex to already exist on the machine.
-- `codex-observatory` works even without patching Codex.
-- `npm` installs download the native binary on first run.
-- Newer Codex installs may not have `~/.codex/history.jsonl`; `codex-observatory` now reconstructs prompt history from `sessions/**/*.jsonl` automatically.
-- Older Codex installs that only have `~/.codex/history.jsonl` still work; prompt/session counts come from history and token/model fields fall back to zero or `unknown` when session logs do not exist.
-
-## Uninstall
-
-Remove the Codex integration first:
+First remove the Codex integration:
 
 ```bash
 codex-observatory uninstall-codex
 ```
 
-Then remove the installer you used:
+Then remove the npm package:
 
-- `npm`: `npm uninstall -g codex-observatory`
-- `pipx`: `pipx uninstall codex-observatory`
-- `pip`: `python -m pip uninstall codex-observatory`
-- Windows binary: `Remove-Item "$HOME\\codex-observatory.exe"`
-- macOS/Linux binary: `rm ./codex-observatory`
-- local repo clone on Windows: `.\scripts\uninstall-codex.ps1`
-- local repo clone on macOS/Linux: `./scripts/uninstall-codex.sh`
+```bash
+npm uninstall -g codex-observatory
+```
+
+## Why Two Uninstall Steps
+
+`npm uninstall -g codex-observatory` removes the npm package itself, but npm does not run uninstall lifecycle hooks for packages anymore. Because `codex stats` works by patching the local `codex` launcher, the clean rollback step has to happen before the npm package is removed.

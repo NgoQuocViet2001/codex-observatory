@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.8 - 2026-03-19
+
+- Added npm-first setup so global npm installs can automatically wire `codex stats` into the local Codex launcher.
+- Simplified the user-facing docs to one main flow: `npm install -g codex-observatory` and then `codex stats`.
+- Added npm publish support in the release workflow and documented the clean two-step uninstall flow required by modern npm.
+
 ## 1.2.7 - 2026-03-19
 
 - Simplified the docs around one recommended user-facing flow: install, patch, then use `codex stats`.

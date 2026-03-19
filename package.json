@@ -1,9 +1,12 @@
 {
   "name": "codex-observatory",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "description": "Production-style local observability and stats dashboard for Codex.",
   "license": "MIT",
   "type": "commonjs",
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "codex-observatory": "bin/codex-observatory.cjs",
     "codex-stats": "bin/codex-observatory.cjs"
@@ -12,10 +15,12 @@
     "README.md",
     "LICENSE",
     "bin/**/*",
-    "lib/**/*"
+    "lib/**/*",
+    "scripts/postinstall.cjs"
   ],
   "scripts": {
-    "test": "node --test npm/tests/platform.test.cjs npm/tests/native.test.cjs npm/tests/history.test.cjs"
+    "postinstall": "node ./scripts/postinstall.cjs",
+    "test": "node --test npm/tests/platform.test.cjs npm/tests/native.test.cjs npm/tests/history.test.cjs npm/tests/postinstall.test.cjs"
   },
   "engines": {
     "node": ">=18"
