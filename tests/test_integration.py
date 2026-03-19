@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 import sys
+import os
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -123,3 +124,50 @@ class CodexIntegrationTests(unittest.TestCase):
             else:
                 self.assertEqual((shim_dir / "codex").read_text(encoding="utf-8"), expected_sh)
             self.assertIn("Removed helper tool", "\n".join(messages))
+
+    @unittest.skipIf(sys.platform == "win32", "Unix launcher symlink behavior is only relevant on Unix")
+    def test_install_integration_wraps_unix_symlink_launcher_without_touching_js_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            repo_root = root / "repo"
+            codex_home = root / ".codex"
+            bin_dir = root / "bin"
+            lib_dir = root / "lib"
+            skill_dir = repo_root / "integrations" / "codex-skill"
+            skill_dir.mkdir(parents=True)
+            skill_dir.joinpath("SKILL.md").write_text("skill", encoding="utf-8")
+            bin_dir.mkdir(parents=True)
+            lib_dir.mkdir(parents=True)
+
+            real_launcher = lib_dir / "codex.js"
+            original_js = "#!/usr/bin/env node\nconsole.log('codex');\n"
+            real_launcher.write_text(original_js, encoding="utf-8")
+
+            launcher_link = bin_dir / "codex"
+            launcher_link.symlink_to(real_launcher)
+
+            messages = install_integration(
+                codex_home=codex_home,
+                repo_root=repo_root,
+                runner_command=default_runner_command(python_bin="python"),
+                patch_codex=True,
+                codex_bin=launcher_link,
+            )
+
+            backup_path = codex_home / "integrations" / "codex-observatory" / "backups" / "codex.orig"
+            self.assertTrue(backup_path.is_symlink())
+            self.assertFalse(launcher_link.is_symlink())
+            self.assertIn("codex-observatory launcher wrapper", launcher_link.read_text(encoding="utf-8"))
+            self.assertEqual(real_launcher.read_text(encoding="utf-8"), original_js)
+            self.assertIn("Patched Codex shim", "\n".join(messages))
+
+            uninstall_messages = uninstall_integration(
+                codex_home=codex_home,
+                codex_bin=launcher_link,
+            )
+
+            self.assertTrue(launcher_link.is_symlink())
+            restored_target = (launcher_link.parent / Path(os.readlink(launcher_link))).resolve()
+            self.assertEqual(restored_target, real_launcher.resolve())
+            self.assertEqual(real_launcher.read_text(encoding="utf-8"), original_js)
+            self.assertIn("Restored Codex shim", "\n".join(uninstall_messages))

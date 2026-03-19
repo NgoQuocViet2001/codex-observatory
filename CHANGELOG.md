@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.9 - 2026-03-19
+
+- Fixed macOS and Unix Codex launcher patching when `codex` resolves to a symlink into `codex.js` instead of a shell shim.
+- Switched Unix launcher integration to a wrapper-based patch so `codex stats` no longer injects shell code into the upstream JavaScript entrypoint.
+- Added a regression test that covers symlink-based Unix launchers and restore-on-uninstall behavior.
+
 ## 1.2.8 - 2026-03-19
 
 - Added npm-first setup so global npm installs can automatically wire `codex stats` into the local Codex launcher.

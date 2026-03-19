@@ -30,6 +30,7 @@ Use this skill when the user wants live local Codex usage information from machi
 PS_MARKER = "# >>> codex-observatory stats hook >>>"
 CMD_MARKER = "REM >>> codex-observatory stats dispatch >>>"
 SH_MARKER = "# >>> codex-observatory stats hook >>>"
+UNIX_WRAPPER_MARKER = "# >>> codex-observatory launcher wrapper >>>"
 
 PS_HOOK = """# >>> codex-observatory stats hook >>>
 if ($args.Length -gt 0 -and ($args[0] -eq 'stats' -or $args[0] -eq 'stat')) {
@@ -114,11 +115,19 @@ def write_text(path: Path, content: str, executable: bool = False) -> None:
         path.chmod(current_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
+def path_exists(path: Path) -> bool:
+    return path.exists() or path.is_symlink()
+
+
 def ensure_backup(path: Path, backup_dir: Path) -> None:
     backup_dir.mkdir(parents=True, exist_ok=True)
     backup_path = backup_dir / f"{path.name}.orig"
-    if not backup_path.exists():
-        shutil.copy2(path, backup_path)
+    if path_exists(backup_path):
+        return
+    if path.is_symlink():
+        backup_path.symlink_to(os.readlink(path))
+        return
+    shutil.copy2(path, backup_path)
 
 
 def patch_powershell_shim(content: str) -> str:
@@ -163,8 +172,63 @@ def patch_shell_shim(content: str) -> str:
     return content.rstrip("\r\n") + newline + newline + hook
 
 
+def render_unix_launcher_wrapper(backup_path: Path) -> str:
+    original_launcher = shell_quote(str(backup_path).replace("\\", "/"))
+    return (
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        f"{UNIX_WRAPPER_MARKER}\n"
+        'if [ "${1-}" = "stats" ] || [ "${1-}" = "stat" ]; then\n'
+        "  shift\n"
+        '  codex_home="${CODEX_HOME:-$HOME/.codex}"\n'
+        '  stats_script="$codex_home/tools/codex-stats.sh"\n'
+        '  if [ ! -f "$stats_script" ]; then\n'
+        '    echo "Missing stats script: $stats_script" >&2\n'
+        "    exit 1\n"
+        "  fi\n"
+        '  exec "$stats_script" "$@"\n'
+        "fi\n"
+        f"exec {original_launcher} \"$@\"\n"
+    )
+
+
+def patch_unix_launcher(path: Path, backup_dir: Path) -> bool:
+    if not path_exists(path) or path.is_dir():
+        return False
+
+    original = path.read_text(encoding="utf-8", errors="ignore")
+    if UNIX_WRAPPER_MARKER in original and not path.is_symlink():
+        return False
+
+    ensure_backup(path, backup_dir)
+    backup_path = backup_dir / f"{path.name}.orig"
+
+    if path.is_symlink():
+        path.unlink()
+
+    write_text(path, render_unix_launcher_wrapper(backup_path), executable=True)
+    return True
+
+
+def restore_backup(target_path: Path, backup_path: Path) -> bool:
+    if not path_exists(backup_path):
+        return False
+
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    if path_exists(target_path):
+        if target_path.is_dir():
+            return False
+        target_path.unlink()
+
+    if backup_path.is_symlink():
+        target_path.symlink_to(os.readlink(backup_path))
+    else:
+        shutil.copy2(backup_path, target_path)
+    return True
+
+
 def patch_file(path: Path, patcher, backup_dir: Path) -> bool:
-    if not path.exists() or path.is_dir():
+    if not path_exists(path) or path.is_dir():
         return False
     original = path.read_text(encoding="utf-8", errors="ignore")
     updated = patcher(original)
@@ -190,19 +254,23 @@ def launcher_targets(*, shim_dir: Path | None = None, codex_bin: Path | None = N
             (shim_root / "codex.cmd", patch_cmd_shim),
             (shim_root / "codex", patch_shell_shim),
         ]
+    return []
+
+
+def resolve_unix_launcher(*, codex_bin: Path | None = None) -> Path | None:
     found_codex = str(codex_bin) if codex_bin else shutil.which("codex")
-    return [(Path(found_codex).resolve(), patch_shell_shim)] if found_codex else []
+    return Path(found_codex).expanduser() if found_codex else None
 
 
 def unlink_if_exists(path: Path) -> bool:
-    if not path.exists() or path.is_dir():
+    if not path_exists(path) or path.is_dir():
         return False
     path.unlink()
     return True
 
 
 def rmtree_if_exists(path: Path) -> bool:
-    if not path.exists():
+    if not path_exists(path):
         return False
     if path.is_dir():
         shutil.rmtree(path)
@@ -299,16 +367,26 @@ def install_integration(
     backup_dir = integration_dir / "backups"
     patched_any = False
 
-    targets = launcher_targets(shim_dir=shim_dir, codex_bin=codex_bin)
-    for path, patcher in targets:
-        if patch_file(path, patcher, backup_dir):
-            messages.append(f"Patched Codex shim: {path}")
-            patched_any = True
-        elif path.exists():
-            messages.append(f"Codex shim already patched: {path}")
+    if os.name == "nt":
+        targets = launcher_targets(shim_dir=shim_dir, codex_bin=codex_bin)
+        for path, patcher in targets:
+            if patch_file(path, patcher, backup_dir):
+                messages.append(f"Patched Codex shim: {path}")
+                patched_any = True
+            elif path_exists(path):
+                messages.append(f"Codex shim already patched: {path}")
 
-    if not patched_any and not any(path.exists() for path, _ in targets):
-        raise FileNotFoundError("Could not find a Codex launcher to patch. Install Codex first, or pass an explicit launcher path.")
+        if not patched_any and not any(path_exists(path) for path, _ in targets):
+            raise FileNotFoundError("Could not find a Codex launcher to patch. Install Codex first, or pass an explicit launcher path.")
+    else:
+        unix_launcher = resolve_unix_launcher(codex_bin=codex_bin)
+        if unix_launcher and patch_unix_launcher(unix_launcher, backup_dir):
+            messages.append(f"Patched Codex shim: {unix_launcher}")
+            patched_any = True
+        elif unix_launcher and path_exists(unix_launcher):
+            messages.append(f"Codex shim already patched: {unix_launcher}")
+        else:
+            raise FileNotFoundError("Could not find a Codex launcher to patch. Install Codex first, or pass an explicit launcher path.")
 
     messages.append(f"Backups are stored in: {backup_dir}")
     return messages
@@ -325,14 +403,20 @@ def uninstall_integration(
     backup_dir = integration_dir / "backups"
 
     restored_any = False
-    for target_path, _patcher in launcher_targets(shim_dir=shim_dir, codex_bin=codex_bin):
-        backup_path = backup_dir / f"{target_path.name}.orig"
-        if not backup_path.exists():
-            continue
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(backup_path, target_path)
-        messages.append(f"Restored Codex shim: {target_path}")
-        restored_any = True
+    if os.name == "nt":
+        for target_path, _patcher in launcher_targets(shim_dir=shim_dir, codex_bin=codex_bin):
+            backup_path = backup_dir / f"{target_path.name}.orig"
+            if not restore_backup(target_path, backup_path):
+                continue
+            messages.append(f"Restored Codex shim: {target_path}")
+            restored_any = True
+    else:
+        unix_launcher = resolve_unix_launcher(codex_bin=codex_bin)
+        if unix_launcher:
+            backup_path = backup_dir / f"{unix_launcher.name}.orig"
+            if restore_backup(unix_launcher, backup_path):
+                messages.append(f"Restored Codex shim: {unix_launcher}")
+                restored_any = True
     if not restored_any:
         messages.append(f"No Codex launcher backups found under: {backup_dir}")
 
