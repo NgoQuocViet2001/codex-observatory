@@ -171,3 +171,69 @@ class CodexIntegrationTests(unittest.TestCase):
             self.assertEqual(restored_target, real_launcher.resolve())
             self.assertEqual(real_launcher.read_text(encoding="utf-8"), original_js)
             self.assertIn("Restored Codex shim", "\n".join(uninstall_messages))
+
+    @unittest.skipIf(sys.platform == "win32", "Legacy Unix launcher recovery is only relevant on Unix")
+    def test_install_integration_recovers_legacy_patched_js_target_before_wrapping(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            repo_root = root / "repo"
+            codex_home = root / ".codex"
+            bin_dir = root / "bin"
+            lib_dir = root / "lib"
+            skill_dir = repo_root / "integrations" / "codex-skill"
+            backup_dir = codex_home / "integrations" / "codex-observatory" / "backups"
+            skill_dir.mkdir(parents=True)
+            skill_dir.joinpath("SKILL.md").write_text("skill", encoding="utf-8")
+            bin_dir.mkdir(parents=True)
+            lib_dir.mkdir(parents=True)
+            backup_dir.mkdir(parents=True)
+
+            real_launcher = lib_dir / "codex.js"
+            original_js = "#!/usr/bin/env node\nconsole.log('codex');\n"
+            real_launcher.write_text("# >>> codex-observatory stats hook >>>\nconsole.log('broken');\n", encoding="utf-8")
+            (backup_dir / "codex.js.orig").write_text(original_js, encoding="utf-8")
+
+            launcher_link = bin_dir / "codex"
+            launcher_link.symlink_to(real_launcher)
+
+            messages = install_integration(
+                codex_home=codex_home,
+                repo_root=repo_root,
+                runner_command=default_runner_command(python_bin="python"),
+                patch_codex=True,
+                codex_bin=launcher_link,
+            )
+
+            self.assertEqual(real_launcher.read_text(encoding="utf-8"), original_js)
+            self.assertFalse(launcher_link.is_symlink())
+            self.assertIn("Restored legacy Codex launcher target", "\n".join(messages))
+
+    @unittest.skipIf(sys.platform == "win32", "Legacy Unix launcher recovery is only relevant on Unix")
+    def test_uninstall_integration_restores_legacy_patched_js_target_without_wrapper_backup(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            codex_home = root / ".codex"
+            bin_dir = root / "bin"
+            lib_dir = root / "lib"
+            backup_dir = codex_home / "integrations" / "codex-observatory" / "backups"
+            bin_dir.mkdir(parents=True)
+            lib_dir.mkdir(parents=True)
+            backup_dir.mkdir(parents=True)
+
+            real_launcher = lib_dir / "codex.js"
+            original_js = "#!/usr/bin/env node\nconsole.log('codex');\n"
+            real_launcher.write_text("# >>> codex-observatory stats hook >>>\nconsole.log('broken');\n", encoding="utf-8")
+            (backup_dir / "codex.js.orig").write_text(original_js, encoding="utf-8")
+
+            launcher_link = bin_dir / "codex"
+            launcher_link.symlink_to(real_launcher)
+
+            messages = uninstall_integration(
+                codex_home=codex_home,
+                codex_bin=launcher_link,
+            )
+
+            self.assertEqual(real_launcher.read_text(encoding="utf-8"), original_js)
+            self.assertTrue(launcher_link.is_symlink())
+            self.assertFalse((codex_home / "integrations" / "codex-observatory").exists())
+            self.assertIn("Restored legacy Codex launcher target", "\n".join(messages))

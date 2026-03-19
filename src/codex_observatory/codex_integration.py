@@ -210,6 +210,43 @@ def patch_unix_launcher(path: Path, backup_dir: Path) -> bool:
     return True
 
 
+def resolve_symlink_target(path: Path) -> Path | None:
+    if not path_exists(path) or not path.is_symlink():
+        return None
+    try:
+        target = (path.parent / Path(os.readlink(path))).resolve()
+    except OSError:
+        return None
+    return target if target != path else None
+
+
+def restore_legacy_unix_target(unix_launcher: Path, backup_dir: Path) -> Path | None:
+    candidate_paths: list[Path] = []
+
+    direct_target = resolve_symlink_target(unix_launcher)
+    if direct_target is not None:
+        candidate_paths.append(direct_target)
+
+    launcher_backup = backup_dir / f"{unix_launcher.name}.orig"
+    backup_target = resolve_symlink_target(launcher_backup)
+    if backup_target is not None and backup_target not in candidate_paths:
+        candidate_paths.append(backup_target)
+
+    for target_path in candidate_paths:
+        backup_path = backup_dir / f"{target_path.name}.orig"
+        if not path_exists(backup_path):
+            continue
+        if path_exists(target_path) and target_path.is_dir():
+            continue
+        if path_exists(target_path):
+            current = target_path.read_text(encoding="utf-8", errors="ignore")
+            if SH_MARKER not in current:
+                continue
+        if restore_backup(target_path, backup_path):
+            return target_path
+    return None
+
+
 def restore_backup(target_path: Path, backup_path: Path) -> bool:
     if not path_exists(backup_path):
         return False
@@ -380,6 +417,9 @@ def install_integration(
             raise FileNotFoundError("Could not find a Codex launcher to patch. Install Codex first, or pass an explicit launcher path.")
     else:
         unix_launcher = resolve_unix_launcher(codex_bin=codex_bin)
+        restored_target = restore_legacy_unix_target(unix_launcher, backup_dir) if unix_launcher else None
+        if restored_target is not None:
+            messages.append(f"Restored legacy Codex launcher target: {restored_target}")
         if unix_launcher and patch_unix_launcher(unix_launcher, backup_dir):
             messages.append(f"Patched Codex shim: {unix_launcher}")
             patched_any = True
@@ -416,6 +456,10 @@ def uninstall_integration(
             backup_path = backup_dir / f"{unix_launcher.name}.orig"
             if restore_backup(unix_launcher, backup_path):
                 messages.append(f"Restored Codex shim: {unix_launcher}")
+                restored_any = True
+            restored_target = restore_legacy_unix_target(unix_launcher, backup_dir)
+            if restored_target is not None:
+                messages.append(f"Restored legacy Codex launcher target: {restored_target}")
                 restored_any = True
     if not restored_any:
         messages.append(f"No Codex launcher backups found under: {backup_dir}")

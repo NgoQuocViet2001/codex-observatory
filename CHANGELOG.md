@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.10 - 2026-03-19
+
+- Repaired upgrades from older macOS and Unix installs that had patched the resolved `codex.js` target instead of the launcher symlink.
+- Added automatic recovery for legacy `codex.js.orig` backups during install and uninstall so broken Homebrew-style launchers can heal on the next update.
+- Added Unix regression tests that cover legacy launcher recovery paths in addition to the wrapper-based patch flow.
+
 ## 1.2.9 - 2026-03-19
 
 - Fixed macOS and Unix Codex launcher patching when `codex` resolves to a symlink into `codex.js` instead of a shell shim.
