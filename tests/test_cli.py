@@ -178,6 +178,12 @@ class CodexObservatoryTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["all_time"]["sessions"], 2)
         self.assertEqual(payload["summary"]["latest_model"], "gpt-5.3-codex")
         self.assertEqual(len(payload["models_30d"]), 2)
+        self.assertAlmostEqual(payload["costs"]["today"]["total_cost_usd"], 0.005005, places=9)
+        self.assertAlmostEqual(payload["costs"]["all_time"]["total_cost_usd"], 0.01103, places=9)
+        self.assertAlmostEqual(payload["costs"]["thirty_days"]["cache_savings_usd"], 0.0027, places=9)
+        self.assertEqual(payload["costs"]["coverage_pct"]["all_time"], 100.0)
+        self.assertEqual(payload["pricing"]["verified_at"], "2026-03-29")
+        self.assertEqual(payload["pricing"]["unpriced_models"], [])
 
     def test_json_summary_works_without_history_file_by_parsing_session_logs(self) -> None:
         codex_home = self.make_fixture(include_history=False)
@@ -222,6 +228,8 @@ class CodexObservatoryTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("CODEX STATS", result.stdout)
+        self.assertIn("COST SNAPSHOT", result.stdout)
+        self.assertIn("Est. $", result.stdout)
         self.assertIn("MODEL BREAKDOWN (30d)", result.stdout)
         self.assertIn("MODEL BREAKDOWN (all-time)", result.stdout)
         self.assertIn("RECENT ACTIVITY", result.stdout)

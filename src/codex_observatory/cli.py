@@ -28,6 +28,57 @@ THEME = {
     "bar": "38;5;45",
     "dim": "38;5;244",
 }
+PRICING_VERIFIED_AT = "2026-03-29"
+PRICING_SOURCES = [
+    "https://openai.com/api/pricing/",
+    "https://developers.openai.com/api/docs/models/gpt-5.4",
+    "https://developers.openai.com/api/docs/models/gpt-5.3-codex",
+    "https://developers.openai.com/api/docs/models/gpt-5.2-codex",
+    "https://developers.openai.com/api/docs/models/gpt-5.1",
+    "https://developers.openai.com/api/docs/models/gpt-5.1-codex",
+    "https://developers.openai.com/api/docs/models/gpt-5.1-codex-max",
+    "https://developers.openai.com/api/docs/models/gpt-5.1-codex-mini",
+    "https://developers.openai.com/api/docs/models/gpt-5",
+    "https://developers.openai.com/api/docs/models/gpt-5-mini",
+    "https://developers.openai.com/api/docs/models/gpt-5-nano",
+    "https://developers.openai.com/api/docs/models/gpt-5-codex",
+    "https://developers.openai.com/api/docs/models/codex-mini-latest",
+]
+
+
+@dataclass(frozen=True)
+class ModelPricing:
+    input_usd_per_million: float
+    cached_input_usd_per_million: float
+    output_usd_per_million: float
+
+
+MODEL_PRICING = {
+    "codex-mini-latest": ModelPricing(1.50, 0.375, 6.00),
+    "gpt-5": ModelPricing(1.25, 0.125, 10.00),
+    "gpt-5-codex": ModelPricing(1.25, 0.125, 10.00),
+    "gpt-5-mini": ModelPricing(0.25, 0.025, 2.00),
+    "gpt-5-nano": ModelPricing(0.05, 0.005, 0.40),
+    "gpt-5.1": ModelPricing(1.25, 0.125, 10.00),
+    "gpt-5.1-codex": ModelPricing(1.25, 0.125, 10.00),
+    "gpt-5.1-codex-max": ModelPricing(1.25, 0.125, 10.00),
+    "gpt-5.1-codex-mini": ModelPricing(0.25, 0.025, 2.00),
+    "gpt-5.2": ModelPricing(1.75, 0.175, 14.00),
+    "gpt-5.2-codex": ModelPricing(1.75, 0.175, 14.00),
+    "gpt-5.3-codex": ModelPricing(1.75, 0.175, 14.00),
+    "gpt-5.4": ModelPricing(2.50, 0.25, 15.00),
+    "gpt-5.4-mini": ModelPricing(0.75, 0.075, 4.50),
+    "gpt-5.4-nano": ModelPricing(0.20, 0.02, 1.25),
+}
+MODEL_ALIASES = {
+    "gpt-5 mini": "gpt-5-mini",
+    "gpt-5 nano": "gpt-5-nano",
+    "gpt-5.1 codex": "gpt-5.1-codex",
+    "gpt-5.1 codex max": "gpt-5.1-codex-max",
+    "gpt-5.1 codex mini": "gpt-5.1-codex-mini",
+    "gpt-5.4 mini": "gpt-5.4-mini",
+    "gpt-5.4 nano": "gpt-5.4-nano",
+}
 
 
 @dataclass(frozen=True)
@@ -89,6 +140,23 @@ class ModelStats:
     output_tokens: int = 0
     reasoning_output_tokens: int = 0
     total_tokens: int = 0
+    input_cost_usd: float = 0.0
+    cached_input_cost_usd: float = 0.0
+    output_cost_usd: float = 0.0
+    total_cost_usd: float = 0.0
+    cache_savings_usd: float = 0.0
+    pricing_model: str | None = None
+
+
+@dataclass
+class CostStats:
+    input_cost_usd: float = 0.0
+    cached_input_cost_usd: float = 0.0
+    output_cost_usd: float = 0.0
+    total_cost_usd: float = 0.0
+    cache_savings_usd: float = 0.0
+    priced_tokens: int = 0
+    unpriced_tokens: int = 0
 
 
 @dataclass
@@ -107,6 +175,12 @@ class Report:
     avg_prompts_per_day: float
     avg_tokens_per_prompt: float
     cache_share_30d: float
+    today_cost: CostStats
+    seven_days_cost: CostStats
+    thirty_days_cost: CostStats
+    all_time_cost: CostStats
+    pricing_verified_at: str
+    unpriced_models: list[str]
     busiest_hour: int
     busiest_day: str
     top_prompt_day: str
@@ -182,6 +256,19 @@ def format_short(value: int | float) -> str:
     if abs_value >= 1_000:
         return f"{value / 1_000:.1f}K"
     return f"{value:.0f}"
+
+
+def format_usd(value: float) -> str:
+    abs_value = abs(value)
+    if abs_value >= 100:
+        return f"${value:,.2f}"
+    if abs_value >= 1:
+        return f"${value:,.2f}"
+    if abs_value >= 0.1:
+        return f"${value:,.3f}"
+    if abs_value >= 0.01:
+        return f"${value:,.4f}"
+    return f"${value:,.5f}"
 
 
 def make_sparkline(values: Sequence[int]) -> str:
@@ -536,6 +623,77 @@ def add_months(year: int, month: int, delta: int) -> tuple[int, int]:
     return new_year, month_index + 1
 
 
+def normalize_model_name(model: str) -> str:
+    normalized = str(model or "unknown").strip().lower()
+    return MODEL_ALIASES.get(normalized, normalized)
+
+
+def resolve_model_pricing(model: str) -> tuple[str | None, ModelPricing | None]:
+    normalized = normalize_model_name(model)
+    pricing = MODEL_PRICING.get(normalized)
+    if pricing is not None:
+        return normalized, pricing
+    for canonical in sorted(MODEL_PRICING, key=len, reverse=True):
+        if normalized.startswith(f"{canonical}-"):
+            return canonical, MODEL_PRICING[canonical]
+    return None, None
+
+
+def estimate_token_costs(input_tokens: int, cached_input_tokens: int, output_tokens: int, pricing: ModelPricing) -> tuple[float, float, float, float, float]:
+    billed_cached_input = max(0, min(cached_input_tokens, input_tokens))
+    billed_uncached_input = max(0, input_tokens - billed_cached_input)
+    input_cost = billed_uncached_input / 1_000_000 * pricing.input_usd_per_million
+    cached_input_cost = billed_cached_input / 1_000_000 * pricing.cached_input_usd_per_million
+    output_cost = output_tokens / 1_000_000 * pricing.output_usd_per_million
+    total_cost = input_cost + cached_input_cost + output_cost
+    cache_savings = billed_cached_input / 1_000_000 * (pricing.input_usd_per_million - pricing.cached_input_usd_per_million)
+    return input_cost, cached_input_cost, output_cost, total_cost, cache_savings
+
+
+def apply_model_pricing(model_name: str, stats: ModelStats) -> bool:
+    pricing_model, pricing = resolve_model_pricing(model_name)
+    stats.pricing_model = pricing_model
+    if pricing is None:
+        return False
+    (
+        stats.input_cost_usd,
+        stats.cached_input_cost_usd,
+        stats.output_cost_usd,
+        stats.total_cost_usd,
+        stats.cache_savings_usd,
+    ) = estimate_token_costs(stats.input_tokens, stats.cached_input_tokens, stats.output_tokens, pricing)
+    return True
+
+
+def summarize_costs(tokens: Sequence[TokenEvent], *, start: datetime | None = None) -> CostStats:
+    out = CostStats()
+    for event in tokens:
+        if start is not None and event.timestamp < start:
+            continue
+        _pricing_model, pricing = resolve_model_pricing(event.model)
+        if pricing is None:
+            out.unpriced_tokens += event.total_tokens
+            continue
+        input_cost, cached_input_cost, output_cost, total_cost, cache_savings = estimate_token_costs(
+            event.input_tokens,
+            event.cached_input_tokens,
+            event.output_tokens,
+            pricing,
+        )
+        out.input_cost_usd += input_cost
+        out.cached_input_cost_usd += cached_input_cost
+        out.output_cost_usd += output_cost
+        out.total_cost_usd += total_cost
+        out.cache_savings_usd += cache_savings
+        out.priced_tokens += event.total_tokens
+    return out
+
+
+def cost_coverage(cost: CostStats) -> float:
+    total_tokens = cost.priced_tokens + cost.unpriced_tokens
+    return (cost.priced_tokens / total_tokens * 100.0) if total_tokens else 100.0
+
+
 def build_report(
     codex_home: Path,
     *,
@@ -655,6 +813,16 @@ def build_report(
             stats.reasoning_output_tokens += event.reasoning_output_tokens
             stats.total_tokens += event.total_tokens
 
+    for name, stats in model_all_time.items():
+        apply_model_pricing(name, stats)
+    for name, stats in model_30d.items():
+        apply_model_pricing(name, stats)
+
+    today_cost = summarize_costs(token_events, start=today_start)
+    seven_days_cost = summarize_costs(token_events, start=today_start - timedelta(days=6))
+    thirty_days_cost = summarize_costs(token_events, start=window_start)
+    all_time_cost = summarize_costs(token_events)
+
     total_30_input = sum(stats.input_tokens for stats in model_30d.values())
     total_30_cached = sum(stats.cached_input_tokens for stats in model_30d.values())
     cache_share_30d = (total_30_cached / total_30_input * 100.0) if total_30_input else 0.0
@@ -667,6 +835,9 @@ def build_report(
         key=lambda item: (-item[1].total_tokens, item[0]),
     )[:top_models]
     top_model_30d = sorted_model_30d[0][0] if sorted_model_30d else "n/a"
+    unpriced_models = sorted(
+        name for name, stats in model_all_time.items() if stats.total_tokens and stats.pricing_model is None
+    )
 
     daily_rows: list[DailyRow] = []
     for offset in range(daily_days - 1, -1, -1):
@@ -731,6 +902,12 @@ def build_report(
         avg_prompts_per_day=avg_prompts_per_day,
         avg_tokens_per_prompt=avg_tokens_per_prompt,
         cache_share_30d=cache_share_30d,
+        today_cost=today_cost,
+        seven_days_cost=seven_days_cost,
+        thirty_days_cost=thirty_days_cost,
+        all_time_cost=all_time_cost,
+        pricing_verified_at=PRICING_VERIFIED_AT,
+        unpriced_models=unpriced_models,
         busiest_hour=busiest_hour,
         busiest_day=busiest_day,
         top_prompt_day=top_prompt_day,
@@ -840,6 +1017,23 @@ def to_json_dict(report: Report, codex_home: Path) -> dict:
             "top_token_day": {"date": report.top_token_day, "tokens": report.top_token_count},
             "top_model_30d": report.top_model_30d,
         },
+        "pricing": {
+            "verified_at": report.pricing_verified_at,
+            "sources": PRICING_SOURCES,
+            "unpriced_models": report.unpriced_models,
+        },
+        "costs": {
+            "today": asdict(report.today_cost),
+            "seven_days": asdict(report.seven_days_cost),
+            "thirty_days": asdict(report.thirty_days_cost),
+            "all_time": asdict(report.all_time_cost),
+            "coverage_pct": {
+                "today": cost_coverage(report.today_cost),
+                "seven_days": cost_coverage(report.seven_days_cost),
+                "thirty_days": cost_coverage(report.thirty_days_cost),
+                "all_time": cost_coverage(report.all_time_cost),
+            },
+        },
         "models_30d": [{"model": name, **asdict(stats)} for name, stats in report.model_30d],
         "models_all_time": [{"model": name, **asdict(stats)} for name, stats in report.model_all_time],
         "recent_activity": [asdict(row) for row in report.daily_rows],
@@ -875,14 +1069,26 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
         )
     )
     add_summary(
-        style.paint(f"Today P:{format_int(report.today.prompts)} S:{format_int(report.today.sessions)} T:{format_short(report.today.tokens)}", "accent")
+        style.paint(
+            f"Today P:{format_int(report.today.prompts)} S:{format_int(report.today.sessions)} T:{format_short(report.today.tokens)} {format_usd(report.today_cost.total_cost_usd)}",
+            "accent",
+        )
         + style.paint("   |   ", "border")
-        + style.paint(f"7d P:{format_int(report.seven_days.prompts)} S:{format_int(report.seven_days.sessions)} T:{format_short(report.seven_days.tokens)}", "good")
+        + style.paint(
+            f"7d P:{format_int(report.seven_days.prompts)} S:{format_int(report.seven_days.sessions)} T:{format_short(report.seven_days.tokens)} {format_usd(report.seven_days_cost.total_cost_usd)}",
+            "good",
+        )
     )
     add_summary(
-        style.paint(f"30d P:{format_int(report.thirty_days.prompts)} S:{format_int(report.thirty_days.sessions)} T:{format_short(report.thirty_days.tokens)}", "warn")
+        style.paint(
+            f"30d P:{format_int(report.thirty_days.prompts)} S:{format_int(report.thirty_days.sessions)} T:{format_short(report.thirty_days.tokens)} {format_usd(report.thirty_days_cost.total_cost_usd)}",
+            "warn",
+        )
         + style.paint("   |   ", "border")
-        + style.paint(f"All-time P:{format_int(report.all_time.prompts)} S:{format_int(report.all_time.sessions)} T:{format_short(report.all_time.tokens)}", "header")
+        + style.paint(
+            f"All-time P:{format_int(report.all_time.prompts)} S:{format_int(report.all_time.sessions)} T:{format_short(report.all_time.tokens)} {format_usd(report.all_time_cost.total_cost_usd)}",
+            "header",
+        )
     )
     add_summary(
         style.paint(f"Active days: {report.active_days}", "good")
@@ -898,7 +1104,12 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
         + style.paint(" | ", "border")
         + style.paint(f"30d cache share: {report.cache_share_30d:.1f}%", "good")
         + style.paint(" | ", "border")
-        + style.paint(f"Busiest hour: {report.busiest_hour:02d}:00", "warn")
+        + style.paint(f"30d cache savings: {format_usd(report.thirty_days_cost.cache_savings_usd)}", "good")
+        + style.paint(" | ", "border")
+        + style.paint(f"Cost coverage: {cost_coverage(report.all_time_cost):.1f}%", "accent")
+    )
+    add_summary(
+        style.paint(f"Busiest hour: {report.busiest_hour:02d}:00", "warn")
         + style.paint(" | ", "border")
         + style.paint(f"Busiest day: {report.busiest_day}", "header")
     )
@@ -911,6 +1122,29 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
     )
     lines.append(bottom)
     lines.append("")
+
+    cost_rows = [
+        style.paint(f"Today estimated spend: {format_usd(report.today_cost.total_cost_usd)}", "accent"),
+        style.paint(f"7d estimated spend: {format_usd(report.seven_days_cost.total_cost_usd)}", "good"),
+        style.paint(f"30d estimated spend: {format_usd(report.thirty_days_cost.total_cost_usd)}", "warn"),
+        style.paint(f"All-time estimated spend: {format_usd(report.all_time_cost.total_cost_usd)}", "header"),
+        style.paint(
+            "30d cost mix: "
+            f"in {format_usd(report.thirty_days_cost.input_cost_usd)}"
+            f" | cache {format_usd(report.thirty_days_cost.cached_input_cost_usd)}"
+            f" | out {format_usd(report.thirty_days_cost.output_cost_usd)}",
+            "dim",
+        ),
+        style.paint(f"30d cache savings vs uncached input: {format_usd(report.thirty_days_cost.cache_savings_usd)}", "good"),
+        style.paint(f"Pricing coverage: {cost_coverage(report.all_time_cost):.1f}% of all-time tokens", "accent"),
+        style.paint(f"Pricing verified: {report.pricing_verified_at}", "dim"),
+    ]
+    if report.unpriced_models:
+        preview = ", ".join(report.unpriced_models[:3])
+        if len(report.unpriced_models) > 3:
+            preview += f" (+{len(report.unpriced_models) - 3} more)"
+        cost_rows.append(style.paint(f"Unpriced models: {preview}", "warn"))
+    lines.extend(render_panel("COST SNAPSHOT", cost_rows, style, layout_width))
 
     heat_rows = [style.paint(report.heatmap_header, "dim")]
     for raw_row in report.heatmap_lines:
@@ -959,19 +1193,20 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
     lines.extend(
         render_table_box(
             "MODEL BREAKDOWN (30d)",
-            ["Model", "Turns", "Tokens", "Share", "Cache"],
+            ["Model", "Turns", "Tokens", "Est. $", "Share", "Cache"],
             [
                 [
                     name,
                     format_int(stats.turns),
                     format_short(stats.total_tokens),
+                    format_usd(stats.total_cost_usd) if stats.pricing_model else "n/a",
                     f"{(stats.total_tokens / total_30_tokens) * 100:.1f}%",
                     f"{(stats.cached_input_tokens / stats.input_tokens * 100) if stats.input_tokens else 0.0:.1f}%",
                 ]
                 for name, stats in report.model_30d
             ],
-            [28, 9, 10, 8, 8],
-            ["left", "right", "right", "right", "right"],
+            [28, 9, 10, 10, 8, 8],
+            ["left", "right", "right", "right", "right", "right"],
             style,
             ranked_themes(len(report.model_30d)),
         )
@@ -1024,7 +1259,7 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
         lines.extend(
             render_table_box(
                 "MODEL BREAKDOWN (all-time)",
-                ["Model", "Turns", "Input", "Cache", "Output", "Reason", "Total", "Share"],
+                ["Model", "Turns", "Input", "Cache", "Output", "Reason", "Total", "Est. $", "Share"],
                 [
                     [
                         name,
@@ -1034,12 +1269,13 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
                         format_short(stats.output_tokens),
                         format_short(stats.reasoning_output_tokens),
                         format_short(stats.total_tokens),
+                        format_usd(stats.total_cost_usd) if stats.pricing_model else "n/a",
                         f"{(stats.total_tokens / total_all_tokens) * 100:.1f}%",
                     ]
                     for name, stats in report.model_all_time
                 ],
-                [24, 8, 10, 10, 10, 10, 10, 8],
-                ["left", "right", "right", "right", "right", "right", "right", "right"],
+                [24, 8, 10, 10, 10, 10, 10, 10, 8],
+                ["left", "right", "right", "right", "right", "right", "right", "right", "right"],
                 style,
                 ranked_themes(len(report.model_all_time)),
             )
