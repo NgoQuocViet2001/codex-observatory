@@ -29,6 +29,7 @@ THEME = {
     "dim": "38;5;244",
 }
 PRICING_VERIFIED_AT = "2026-03-29"
+API_EQUIVALENT_NOTE = "Estimated API-equivalent spend only; Codex app or subscription billing may differ."
 PRICING_SOURCES = [
     "https://openai.com/api/pricing/",
     "https://developers.openai.com/api/docs/models/gpt-5.4",
@@ -123,6 +124,7 @@ class DailyRow:
     prompts: int
     sessions: int
     tokens: int
+    cost_usd: float
 
 
 @dataclass
@@ -130,6 +132,15 @@ class MonthlyRow:
     month: str
     prompts: int
     tokens: int
+    cost_usd: float
+
+
+@dataclass
+class DOWRow:
+    day: str
+    prompts: int
+    tokens: int
+    cost_usd: float
 
 
 @dataclass
@@ -180,6 +191,7 @@ class Report:
     thirty_days_cost: CostStats
     all_time_cost: CostStats
     pricing_verified_at: str
+    pricing_scope_note: str
     unpriced_models: list[str]
     busiest_hour: int
     busiest_day: str
@@ -195,7 +207,7 @@ class Report:
     model_all_time: list[tuple[str, ModelStats]]
     daily_rows: list[DailyRow]
     monthly_rows: list[MonthlyRow]
-    dow_rows: list[tuple[str, int, int]]
+    dow_rows: list[DOWRow]
 
 
 class Style:
@@ -260,6 +272,8 @@ def format_short(value: int | float) -> str:
 
 def format_usd(value: float) -> str:
     abs_value = abs(value)
+    if abs_value == 0:
+        return "$0.00"
     if abs_value >= 100:
         return f"${value:,.2f}"
     if abs_value >= 1:
@@ -694,6 +708,19 @@ def cost_coverage(cost: CostStats) -> float:
     return (cost.priced_tokens / total_tokens * 100.0) if total_tokens else 100.0
 
 
+def estimate_event_cost_total(event: TokenEvent) -> float:
+    _pricing_model, pricing = resolve_model_pricing(event.model)
+    if pricing is None:
+        return 0.0
+    _input_cost, _cached_input_cost, _output_cost, total_cost, _cache_savings = estimate_token_costs(
+        event.input_tokens,
+        event.cached_input_tokens,
+        event.output_tokens,
+        pricing,
+    )
+    return total_cost
+
+
 def build_report(
     codex_home: Path,
     *,
@@ -733,10 +760,17 @@ def build_report(
     token_by_date = Counter()
     token_by_month = Counter()
     token_by_dow = [0] * 7
+    cost_by_date: dict[str, float] = {}
+    cost_by_month: dict[str, float] = {}
+    cost_by_dow = [0.0] * 7
     for event in token_events:
         token_by_date[event.date_key] += event.total_tokens
         token_by_month[event.month_key] += event.total_tokens
         token_by_dow[event.dow] += event.total_tokens
+        event_cost = estimate_event_cost_total(event)
+        cost_by_date[event.date_key] = cost_by_date.get(event.date_key, 0.0) + event_cost
+        cost_by_month[event.month_key] = cost_by_month.get(event.month_key, 0.0) + event_cost
+        cost_by_dow[event.dow] += event_cost
 
     today_start = datetime(now.year, now.month, now.day)
     stats_today = get_period_stats(prompt_events, token_events, today_start)
@@ -849,6 +883,7 @@ def build_report(
                 prompts=prompt_by_date.get(key, 0),
                 sessions=len(sessions_by_date.get(key, set())),
                 tokens=token_by_date.get(key, 0),
+                cost_usd=cost_by_date.get(key, 0.0),
             )
         )
 
@@ -856,7 +891,14 @@ def build_report(
     for offset in range(monthly_months - 1, -1, -1):
         year, month = add_months(today_start.year, today_start.month, -offset)
         key = f"{year:04d}-{month:02d}"
-        monthly_rows.append(MonthlyRow(month=key, prompts=prompt_by_month.get(key, 0), tokens=token_by_month.get(key, 0)))
+        monthly_rows.append(
+            MonthlyRow(
+                month=key,
+                prompts=prompt_by_month.get(key, 0),
+                tokens=token_by_month.get(key, 0),
+                cost_usd=cost_by_month.get(key, 0.0),
+            )
+        )
 
     heat_start = today_start.date() - timedelta(days=heatmap_weeks * 7 - 1)
     while heat_start.weekday() != 0:
@@ -885,7 +927,15 @@ def build_report(
             cells.append(heat_cell(count, peak, raw_style))
         heat_lines.append(f"{label:<3}  {''.join(cells)}")
 
-    dow_rows = [(DOW_NAMES[index], prompt_by_dow[index], token_by_dow[index]) for index in range(7)]
+    dow_rows = [
+        DOWRow(
+            day=DOW_NAMES[index],
+            prompts=prompt_by_dow[index],
+            tokens=token_by_dow[index],
+            cost_usd=cost_by_dow[index],
+        )
+        for index in range(7)
+    ]
 
     return Report(
         generated_at=now,
@@ -907,6 +957,7 @@ def build_report(
         thirty_days_cost=thirty_days_cost,
         all_time_cost=all_time_cost,
         pricing_verified_at=PRICING_VERIFIED_AT,
+        pricing_scope_note=API_EQUIVALENT_NOTE,
         unpriced_models=unpriced_models,
         busiest_hour=busiest_hour,
         busiest_day=busiest_day,
@@ -1019,6 +1070,7 @@ def to_json_dict(report: Report, codex_home: Path) -> dict:
         },
         "pricing": {
             "verified_at": report.pricing_verified_at,
+            "scope_note": report.pricing_scope_note,
             "sources": PRICING_SOURCES,
             "unpriced_models": report.unpriced_models,
         },
@@ -1038,7 +1090,7 @@ def to_json_dict(report: Report, codex_home: Path) -> dict:
         "models_all_time": [{"model": name, **asdict(stats)} for name, stats in report.model_all_time],
         "recent_activity": [asdict(row) for row in report.daily_rows],
         "monthly_trend": [asdict(row) for row in report.monthly_rows],
-        "day_of_week": [{"day": day, "prompts": prompts, "tokens": tokens} for day, prompts, tokens in report.dow_rows],
+        "day_of_week": [asdict(row) for row in report.dow_rows],
     }
 
 
@@ -1070,23 +1122,23 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
     )
     add_summary(
         style.paint(
-            f"Today P:{format_int(report.today.prompts)} S:{format_int(report.today.sessions)} T:{format_short(report.today.tokens)} {format_usd(report.today_cost.total_cost_usd)}",
+            f"Today P:{format_int(report.today.prompts)} S:{format_int(report.today.sessions)} T:{format_short(report.today.tokens)} API {format_usd(report.today_cost.total_cost_usd)}",
             "accent",
         )
         + style.paint("   |   ", "border")
         + style.paint(
-            f"7d P:{format_int(report.seven_days.prompts)} S:{format_int(report.seven_days.sessions)} T:{format_short(report.seven_days.tokens)} {format_usd(report.seven_days_cost.total_cost_usd)}",
+            f"7d P:{format_int(report.seven_days.prompts)} S:{format_int(report.seven_days.sessions)} T:{format_short(report.seven_days.tokens)} API {format_usd(report.seven_days_cost.total_cost_usd)}",
             "good",
         )
     )
     add_summary(
         style.paint(
-            f"30d P:{format_int(report.thirty_days.prompts)} S:{format_int(report.thirty_days.sessions)} T:{format_short(report.thirty_days.tokens)} {format_usd(report.thirty_days_cost.total_cost_usd)}",
+            f"30d P:{format_int(report.thirty_days.prompts)} S:{format_int(report.thirty_days.sessions)} T:{format_short(report.thirty_days.tokens)} API {format_usd(report.thirty_days_cost.total_cost_usd)}",
             "warn",
         )
         + style.paint("   |   ", "border")
         + style.paint(
-            f"All-time P:{format_int(report.all_time.prompts)} S:{format_int(report.all_time.sessions)} T:{format_short(report.all_time.tokens)} {format_usd(report.all_time_cost.total_cost_usd)}",
+            f"All-time P:{format_int(report.all_time.prompts)} S:{format_int(report.all_time.sessions)} T:{format_short(report.all_time.tokens)} API {format_usd(report.all_time_cost.total_cost_usd)}",
             "header",
         )
     )
@@ -1124,12 +1176,13 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
     lines.append("")
 
     cost_rows = [
-        style.paint(f"Today estimated spend: {format_usd(report.today_cost.total_cost_usd)}", "accent"),
-        style.paint(f"7d estimated spend: {format_usd(report.seven_days_cost.total_cost_usd)}", "good"),
-        style.paint(f"30d estimated spend: {format_usd(report.thirty_days_cost.total_cost_usd)}", "warn"),
-        style.paint(f"All-time estimated spend: {format_usd(report.all_time_cost.total_cost_usd)}", "header"),
+        style.paint(report.pricing_scope_note, "muted"),
+        style.paint(f"Today estimated API spend: {format_usd(report.today_cost.total_cost_usd)}", "accent"),
+        style.paint(f"7d estimated API spend: {format_usd(report.seven_days_cost.total_cost_usd)}", "good"),
+        style.paint(f"30d estimated API spend: {format_usd(report.thirty_days_cost.total_cost_usd)}", "warn"),
+        style.paint(f"All-time estimated API spend: {format_usd(report.all_time_cost.total_cost_usd)}", "header"),
         style.paint(
-            "30d cost mix: "
+            "30d API cost mix: "
             f"in {format_usd(report.thirty_days_cost.input_cost_usd)}"
             f" | cache {format_usd(report.thirty_days_cost.cached_input_cost_usd)}"
             f" | out {format_usd(report.thirty_days_cost.output_cost_usd)}",
@@ -1144,7 +1197,7 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
         if len(report.unpriced_models) > 3:
             preview += f" (+{len(report.unpriced_models) - 3} more)"
         cost_rows.append(style.paint(f"Unpriced models: {preview}", "warn"))
-    lines.extend(render_panel("COST SNAPSHOT", cost_rows, style, layout_width))
+    lines.extend(render_panel("API COST SNAPSHOT", cost_rows, style, layout_width))
 
     heat_rows = [style.paint(report.heatmap_header, "dim")]
     for raw_row in report.heatmap_lines:
@@ -1193,7 +1246,7 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
     lines.extend(
         render_table_box(
             "MODEL BREAKDOWN (30d)",
-            ["Model", "Turns", "Tokens", "Est. $", "Share", "Cache"],
+            ["Model", "Turns", "Tokens", "API $", "Share", "Cache"],
             [
                 [
                     name,
@@ -1217,19 +1270,20 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
         lines.extend(
             render_table_box(
                 f"RECENT ACTIVITY ({len(report.daily_rows)} days)",
-                ["Date", "Prompts", "Sessions", "Tokens", "Load"],
+                ["Date", "Prompts", "Sessions", "Tokens", "API $", "Load"],
                 [
                     [
                         style.paint(row.date, "good") if row is report.daily_rows[-1] else row.date,
                         format_int(row.prompts),
                         format_int(row.sessions),
                         format_short(row.tokens),
+                        format_usd(row.cost_usd),
                         make_bar(row.tokens, peak_daily_tokens, 20, style),
                     ]
                     for row in report.daily_rows
                 ],
-                [10, 9, 10, 11, 20],
-                ["left", "right", "right", "right", "left"],
+                [10, 9, 10, 11, 10, 20],
+                ["left", "right", "right", "right", "right", "left"],
                 style,
             )
         )
@@ -1239,17 +1293,18 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
     lines.extend(
         render_table_box(
             "MONTHLY TABLE",
-            ["Month", "Prompts", "Tokens"],
+            ["Month", "Prompts", "Tokens", "API $"],
             [
                 [
                     style.paint(row.month, "good") if row is report.monthly_rows[-1] else row.month,
                     format_int(row.prompts),
                     format_short(row.tokens),
+                    format_usd(row.cost_usd),
                 ]
                 for row in report.monthly_rows
             ],
-            [10, 10, 12],
-            ["left", "right", "right"],
+            [10, 10, 12, 10],
+            ["left", "right", "right", "right"],
             style,
         )
     )
@@ -1259,7 +1314,7 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
         lines.extend(
             render_table_box(
                 "MODEL BREAKDOWN (all-time)",
-                ["Model", "Turns", "Input", "Cache", "Output", "Reason", "Total", "Est. $", "Share"],
+                ["Model", "Turns", "Input", "Cache", "Output", "Reason", "Total", "API $", "Share"],
                 [
                     [
                         name,
@@ -1281,22 +1336,23 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
             )
         )
 
-        peak_dow_tokens = max((tokens for _, _, tokens in report.dow_rows), default=0)
+        peak_dow_tokens = max((row.tokens for row in report.dow_rows), default=0)
         lines.extend(
             render_table_box(
                 "DAY-OF-WEEK PATTERN (all-time)",
-                ["Day", "Prompts", "Tokens", "Load"],
+                ["Day", "Prompts", "Tokens", "API $", "Load"],
                 [
                     [
-                        style.paint(day, "hot") if day == report.busiest_day else day,
-                        format_int(prompts),
-                        format_short(tokens),
-                        make_bar(tokens, peak_dow_tokens, 20, style),
+                        style.paint(row.day, "hot") if row.day == report.busiest_day else row.day,
+                        format_int(row.prompts),
+                        format_short(row.tokens),
+                        format_usd(row.cost_usd),
+                        make_bar(row.tokens, peak_dow_tokens, 20, style),
                     ]
-                    for day, prompts, tokens in report.dow_rows
+                    for row in report.dow_rows
                 ],
-                [8, 10, 12, 20],
-                ["left", "right", "right", "left"],
+                [8, 10, 12, 10, 20],
+                ["left", "right", "right", "right", "left"],
                 style,
             )
         )
