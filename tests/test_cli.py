@@ -178,6 +178,24 @@ class CodexObservatoryTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["all_time"]["sessions"], 2)
         self.assertEqual(payload["summary"]["latest_model"], "gpt-5.3-codex")
         self.assertEqual(len(payload["models_30d"]), 2)
+        self.assertAlmostEqual(payload["costs"]["today"]["total_cost_usd"], 0.005005, places=9)
+        self.assertAlmostEqual(payload["costs"]["all_time"]["total_cost_usd"], 0.01103, places=9)
+        self.assertAlmostEqual(payload["costs"]["thirty_days"]["cache_savings_usd"], 0.0027, places=9)
+        self.assertEqual(payload["costs"]["coverage_pct"]["all_time"], 100.0)
+        self.assertEqual(payload["pricing"]["verified_at"], "2026-03-29")
+        self.assertEqual(
+            payload["pricing"]["scope_note"],
+            "Estimated API-equivalent spend only; Codex app or subscription billing may differ.",
+        )
+        self.assertEqual(payload["pricing"]["unpriced_models"], [])
+        recent_activity = {row["date"]: row["cost_usd"] for row in payload["recent_activity"]}
+        monthly_trend = {row["month"]: row["cost_usd"] for row in payload["monthly_trend"]}
+        day_of_week = {row["day"]: row["cost_usd"] for row in payload["day_of_week"]}
+        self.assertAlmostEqual(recent_activity["03-18"], 0.006025, places=9)
+        self.assertAlmostEqual(recent_activity["03-19"], 0.005005, places=9)
+        self.assertAlmostEqual(monthly_trend["2026-03"], 0.01103, places=9)
+        self.assertAlmostEqual(day_of_week["Wed"], 0.006025, places=9)
+        self.assertAlmostEqual(day_of_week["Thu"], 0.005005, places=9)
 
     def test_json_summary_works_without_history_file_by_parsing_session_logs(self) -> None:
         codex_home = self.make_fixture(include_history=False)
@@ -222,6 +240,9 @@ class CodexObservatoryTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("CODEX STATS", result.stdout)
+        self.assertIn("API COST SNAPSHOT", result.stdout)
+        self.assertIn("API $", result.stdout)
+        self.assertIn("Estimated API-equivalent spend only", result.stdout)
         self.assertIn("MODEL BREAKDOWN (30d)", result.stdout)
         self.assertIn("MODEL BREAKDOWN (all-time)", result.stdout)
         self.assertIn("RECENT ACTIVITY", result.stdout)

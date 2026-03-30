@@ -1,6 +1,6 @@
 # Codex Observatory
 
-Local stats dashboard for Codex. Read usage directly from machine logs and use `codex stats` like it was built into Codex.
+Local stats dashboard for Codex. Read usage directly from machine logs, estimate API spend from model pricing, and use `codex stats` like it was built into Codex.
 
 [![CI](https://github.com/NgoQuocViet2001/codex-observatory/actions/workflows/ci.yml/badge.svg)](https://github.com/NgoQuocViet2001/codex-observatory/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/NgoQuocViet2001/codex-observatory)](https://github.com/NgoQuocViet2001/codex-observatory/releases)
@@ -49,7 +49,7 @@ codex-observatory install-codex --patch-codex
 | `codex stats` | Recommended dashboard command |
 | `codex stats compact` | Short dashboard |
 | `codex stats full` | Detailed dashboard |
-| `codex stats --json` | JSON output |
+| `codex stats --json` | JSON output including cost and pricing metadata |
 | `codex-observatory install-codex --patch-codex` | Reinstall or repair the Codex launcher patch |
 | `codex-observatory uninstall-codex` | Remove the Codex integration and restore launcher backups |
 
@@ -83,6 +83,9 @@ The first command removes the Codex integration and restores the patched `codex`
 - `npm` installs download the matching native binary automatically.
 - If `history.jsonl` is missing, Codex Observatory rebuilds prompt history from session logs.
 - If `sessions/` is missing but `history.jsonl` exists, Codex Observatory still renders prompt and session counts and falls back to zero token totals plus `unknown` model metadata.
+- Estimated spend uses built-in OpenAI API pricing by model, billing uncached input, cached input, and output separately.
+- Spend figures are API-equivalent estimates only and may not match Codex app or subscription billing.
+- Pricing coverage is reported explicitly so unknown or unsupported models do not silently skew totals.
 
 ## Docs
 
