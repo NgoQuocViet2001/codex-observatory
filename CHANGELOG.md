@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.12 - 2026-03-30
+
+- Added API-equivalent cost estimates based on built-in model pricing for today, 7d, 30d, and all-time usage views.
+- Added pricing coverage, cache savings, and unpriced model metadata so spend estimates stay transparent when some models cannot be priced.
+- Updated the terminal dashboard, JSON output, tests, and docs to reflect the new cost-reporting scope and disclaimer.
+
 ## 1.2.11 - 2026-03-20
 
 - Rebuilt missing Unix launcher backups automatically when a wrapped `codex` launcher still exists but `codex.orig` has been deleted.
