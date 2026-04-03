@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.13 - 2026-04-03
+
+- Switched npm history backfills to stream session JSONL files instead of loading entire multi-GB logs into memory, preventing the large-session V8 crash in `codex stats full`.
+- Added a configurable session file size cap for synthetic history rebuilds and fixed the cache invalidation path so raising `CODEX_OBSERVATORY_MAX_SESSION_FILE_BYTES` correctly backfills sessions that were previously skipped.
+
 ## 1.2.12 - 2026-03-30
 
 - Added API-equivalent cost estimates based on built-in model pricing for today, 7d, 30d, and all-time usage views.
