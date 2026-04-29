@@ -34,6 +34,19 @@ codex stats full
 codex stats --json
 ```
 
+Time range examples:
+
+```bash
+codex stats --day 2026-04-29
+codex stats --days 14
+codex stats --month 2026-04
+codex stats --months 12
+codex stats --year 2026
+codex stats --from 2026-04-01 --to 2026-04-15
+```
+
+Use `--day` for one date, `--month` for daily detail inside one month, `--year` for a 12-month view, and `--from/--to` for an inclusive custom date range.
+
 Global npm install auto-runs the Codex integration step and patches the local `codex` launcher so `codex stats` works immediately.
 
 If your npm install was run with scripts disabled, or Codex was not installed yet, repair the setup with:
@@ -50,6 +63,10 @@ codex-observatory install-codex --patch-codex
 | `codex stats compact` | Short dashboard |
 | `codex stats full` | Detailed dashboard |
 | `codex stats --json` | JSON output including cost and pricing metadata |
+| `codex stats --day YYYY-MM-DD` | One day with daily token detail |
+| `codex stats --month YYYY-MM` | One month with daily and monthly token detail |
+| `codex stats --year YYYY` | One calendar year with monthly token detail |
+| `codex stats --from YYYY-MM-DD --to YYYY-MM-DD` | Inclusive custom date range |
 | `codex-observatory install-codex --patch-codex` | Reinstall or repair the Codex launcher patch |
 | `codex-observatory uninstall-codex` | Remove the Codex integration and restore launcher backups |
 

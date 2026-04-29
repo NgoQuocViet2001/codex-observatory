@@ -19,6 +19,12 @@ codex stats --json
 | `--json` | Output JSON instead of terminal UI |
 | `--daily-days N` | Show N daily rows |
 | `--monthly-months N` | Show N monthly rows |
+| `--day YYYY-MM-DD` | Show one calendar day |
+| `--days N` | Show/select the last N days |
+| `--month YYYY-MM` | Show one calendar month with daily rows |
+| `--months N` | Show/select the last N months |
+| `--year YYYY` | Show one calendar year with monthly rows |
+| `--from YYYY-MM-DD --to YYYY-MM-DD` | Show an inclusive custom date range |
 | `--heatmap-weeks N` | Show N heatmap weeks |
 | `--top-models N` | Show top N models |
 | `--width N` | Force render width |
@@ -32,6 +38,10 @@ codex stats compact --no-color
 codex stats full --daily-days 14 --monthly-months 12
 codex stats full --top-models 8
 codex stats --json
+codex stats --day 2026-04-29
+codex stats --month 2026-04
+codex stats --year 2026
+codex stats --from 2026-04-01 --to 2026-04-15
 ```
 
 ## Token Detail

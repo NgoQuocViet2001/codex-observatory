@@ -267,6 +267,76 @@ class CodexObservatoryTests(unittest.TestCase):
         self.assertAlmostEqual(payload["costs"]["today"]["total_cost_usd"], 3.125, places=9)
         self.assertEqual(payload["pricing"]["unpriced_models"], [])
 
+    def test_json_month_selector_expands_daily_rows_for_that_month(self) -> None:
+        codex_home = self.make_fixture()
+        result = self.run_cli("--json", "--codex-home", str(codex_home), "--now", "2026-03-19T10:00:00", "--month", "2026-03")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(payload["selected_range"]["label"], "2026-03")
+        self.assertEqual(payload["selected_range"]["start_date"], "2026-03-01")
+        self.assertEqual(payload["selected_range"]["end_date"], "2026-03-31")
+        self.assertEqual(payload["selected_range"]["stats"]["prompts"], 3)
+        self.assertEqual(payload["selected_range"]["stats"]["tokens"], 4030)
+        self.assertEqual(len(payload["recent_activity"]), 31)
+        self.assertEqual(payload["recent_activity"][17]["date"], "03-18")
+        self.assertEqual(payload["recent_activity"][17]["input_tokens"], 1600)
+        self.assertEqual(len(payload["monthly_trend"]), 1)
+        self.assertEqual(payload["monthly_trend"][0]["month"], "2026-03")
+        self.assertEqual(payload["monthly_trend"][0]["prompts"], 3)
+        self.assertEqual(payload["monthly_trend"][0]["turns"], 2)
+        self.assertEqual(payload["monthly_trend"][0]["input_tokens"], 3600)
+        self.assertEqual(payload["monthly_trend"][0]["cached_input_tokens"], 1500)
+        self.assertEqual(payload["monthly_trend"][0]["output_tokens"], 430)
+        self.assertEqual(payload["monthly_trend"][0]["reasoning_output_tokens"], 210)
+        self.assertEqual(payload["monthly_trend"][0]["tokens"], 4030)
+        self.assertAlmostEqual(payload["monthly_trend"][0]["cost_usd"], 0.01103, places=9)
+
+    def test_json_custom_date_range_selector_is_inclusive(self) -> None:
+        codex_home = self.make_fixture()
+        result = self.run_cli(
+            "--json",
+            "--codex-home",
+            str(codex_home),
+            "--now",
+            "2026-03-19T10:00:00",
+            "--from",
+            "2026-03-18",
+            "--to",
+            "2026-03-18",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(payload["selected_range"]["label"], "2026-03-18..2026-03-18")
+        self.assertEqual(payload["selected_range"]["stats"]["prompts"], 2)
+        self.assertEqual(payload["selected_range"]["stats"]["turns"], 1)
+        self.assertEqual(payload["selected_range"]["stats"]["tokens"], 1810)
+        self.assertEqual(len(payload["recent_activity"]), 1)
+        self.assertEqual(payload["recent_activity"][0]["date"], "03-18")
+
+        day_result = self.run_cli("--json", "--codex-home", str(codex_home), "--now", "2026-03-19T10:00:00", "--day", "2026-03-18")
+        self.assertEqual(day_result.returncode, 0, day_result.stderr)
+        day_payload = json.loads(day_result.stdout)
+        self.assertEqual(day_payload["selected_range"]["label"], "2026-03-18")
+        self.assertEqual(day_payload["selected_range"]["stats"], payload["selected_range"]["stats"])
+
+    def test_json_year_selector_expands_monthly_rows_for_the_year(self) -> None:
+        codex_home = self.make_fixture()
+        result = self.run_cli("--json", "--codex-home", str(codex_home), "--now", "2026-03-19T10:00:00", "--year", "2026")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(payload["selected_range"]["label"], "2026")
+        self.assertEqual(payload["selected_range"]["start_date"], "2026-01-01")
+        self.assertEqual(payload["selected_range"]["end_date"], "2026-12-31")
+        self.assertEqual(payload["selected_range"]["stats"]["prompts"], 3)
+        self.assertEqual(len(payload["monthly_trend"]), 12)
+        self.assertEqual(payload["monthly_trend"][0]["month"], "2026-01")
+        self.assertEqual(payload["monthly_trend"][2]["month"], "2026-03")
+        self.assertEqual(payload["monthly_trend"][2]["tokens"], 4030)
+        self.assertEqual(payload["monthly_trend"][-1]["month"], "2026-12")
+
     def test_json_summary_works_without_history_file_by_parsing_session_logs(self) -> None:
         codex_home = self.make_fixture(include_history=False)
         result = self.run_cli("--json", "--codex-home", str(codex_home), "--now", "2026-03-19T10:00:00")

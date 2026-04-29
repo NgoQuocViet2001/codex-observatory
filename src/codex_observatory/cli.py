@@ -8,7 +8,7 @@ import shutil
 import sys
 from collections import Counter
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Sequence
 
@@ -196,6 +196,15 @@ class DOWRow:
 
 
 @dataclass
+class SelectedRange:
+    label: str
+    start_date: str
+    end_date: str
+    stats: PeriodStats
+    cost: CostStats
+
+
+@dataclass
 class ModelStats:
     turns: int = 0
     input_tokens: int = 0
@@ -255,6 +264,9 @@ class Report:
     heatmap_weeks: int
     heatmap_header: str
     heatmap_lines: list[str]
+    selected_range: SelectedRange | None
+    daily_title: str
+    monthly_title: str
     model_30d: list[tuple[str, ModelStats]]
     model_all_time: list[tuple[str, ModelStats]]
     daily_rows: list[DailyRow]
@@ -681,15 +693,16 @@ def get_period_stats(
     turns: Sequence[TurnEvent],
     tokens: Sequence[TokenEvent],
     start: datetime,
+    end: datetime | None = None,
 ) -> PeriodStats:
-    prompt_slice = [event for event in prompts if event.timestamp >= start]
+    prompt_slice = [event for event in prompts if event.timestamp >= start and (end is None or event.timestamp < end)]
     stats = PeriodStats(
         prompts=len(prompt_slice),
         sessions=len({event.session_id for event in prompt_slice}),
-        turns=sum(1 for event in turns if event.timestamp >= start),
+        turns=sum(1 for event in turns if event.timestamp >= start and (end is None or event.timestamp < end)),
     )
     for event in tokens:
-        if event.timestamp >= start:
+        if event.timestamp >= start and (end is None or event.timestamp < end):
             add_token_breakdown(stats, event)
     return stats
 
@@ -708,6 +721,26 @@ def add_months(year: int, month: int, delta: int) -> tuple[int, int]:
     zero_based = year * 12 + (month - 1) + delta
     new_year, month_index = divmod(zero_based, 12)
     return new_year, month_index + 1
+
+
+def month_date_range(year: int, month: int) -> tuple[date, date]:
+    start = date(year, month, 1)
+    next_year, next_month = add_months(year, month, 1)
+    end = date(next_year, next_month, 1) - timedelta(days=1)
+    return start, end
+
+
+def parse_date_value(raw_value: str) -> date:
+    return datetime.strptime(raw_value, "%Y-%m-%d").date()
+
+
+def parse_month_value(raw_value: str) -> tuple[int, int]:
+    parsed = datetime.strptime(raw_value, "%Y-%m")
+    return parsed.year, parsed.month
+
+
+def start_of_day(day: date) -> datetime:
+    return datetime(day.year, day.month, day.day)
 
 
 def normalize_model_name(model: str) -> str:
@@ -787,10 +820,17 @@ def add_model_token_event(stats: ModelStats, event: TokenEvent) -> None:
     stats.cache_savings_usd += cache_savings
 
 
-def summarize_costs(tokens: Sequence[TokenEvent], *, start: datetime | None = None) -> CostStats:
+def summarize_costs(
+    tokens: Sequence[TokenEvent],
+    *,
+    start: datetime | None = None,
+    end: datetime | None = None,
+) -> CostStats:
     out = CostStats()
     for event in tokens:
         if start is not None and event.timestamp < start:
+            continue
+        if end is not None and event.timestamp >= end:
             continue
         _pricing_model, pricing = resolve_model_pricing(event.model)
         if pricing is None:
@@ -837,6 +877,13 @@ def build_report(
     monthly_months: int,
     heatmap_weeks: int,
     top_models: int,
+    selected_label: str | None = None,
+    selected_start: date | None = None,
+    selected_end: date | None = None,
+    daily_start: date | None = None,
+    daily_end: date | None = None,
+    monthly_start: date | None = None,
+    monthly_end: date | None = None,
     status: Callable[[str], None] | None = None,
 ) -> Report:
     prompt_events, latest_prompt_time = load_prompt_history(codex_home, status=status)
@@ -965,6 +1012,17 @@ def build_report(
     seven_days_cost = summarize_costs(token_events, start=today_start - timedelta(days=6))
     thirty_days_cost = summarize_costs(token_events, start=window_start)
     all_time_cost = summarize_costs(token_events)
+    selected_range: SelectedRange | None = None
+    if selected_label and selected_start and selected_end:
+        selected_start_dt = start_of_day(selected_start)
+        selected_end_exclusive = start_of_day(selected_end + timedelta(days=1))
+        selected_range = SelectedRange(
+            label=selected_label,
+            start_date=selected_start.isoformat(),
+            end_date=selected_end.isoformat(),
+            stats=get_period_stats(prompt_events, turn_events, token_events, selected_start_dt, selected_end_exclusive),
+            cost=summarize_costs(token_events, start=selected_start_dt, end=selected_end_exclusive),
+        )
 
     total_30_input = sum(stats.input_tokens for stats in model_30d.values())
     total_30_cached = sum(stats.cached_input_tokens for stats in model_30d.values())
@@ -983,8 +1041,19 @@ def build_report(
     )
 
     daily_rows: list[DailyRow] = []
-    for offset in range(daily_days - 1, -1, -1):
-        day = today_start.date() - timedelta(days=offset)
+    if daily_start and daily_end:
+        display_daily_start = daily_start
+        daily_span_days = (daily_end - daily_start).days + 1
+        daily_title = f"DAILY ACTIVITY ({selected_label or f'{daily_start.isoformat()}..{daily_end.isoformat()}'})"
+        if daily_span_days > 366:
+            display_daily_start = daily_end - timedelta(days=365)
+            daily_title = f"{daily_title}, last 366 days shown"
+        daily_dates = [display_daily_start + timedelta(days=offset) for offset in range((daily_end - display_daily_start).days + 1)]
+    else:
+        daily_title = f"RECENT ACTIVITY ({daily_days} days)"
+        daily_dates = [today_start.date() - timedelta(days=offset) for offset in range(daily_days - 1, -1, -1)]
+
+    for day in daily_dates:
         key = day.strftime("%Y-%m-%d")
         token_stats = token_by_date.get(key, PeriodStats())
         daily_rows.append(
@@ -1003,8 +1072,23 @@ def build_report(
         )
 
     monthly_rows: list[MonthlyRow] = []
-    for offset in range(monthly_months - 1, -1, -1):
-        year, month = add_months(today_start.year, today_start.month, -offset)
+    if monthly_start and monthly_end:
+        monthly_title = f"MONTHLY TABLE ({selected_label or f'{monthly_start:%Y-%m}..{monthly_end:%Y-%m}'})"
+        monthly_dates: list[date] = []
+        current_year, current_month = monthly_start.year, monthly_start.month
+        last_month_key = monthly_end.year * 12 + monthly_end.month
+        while current_year * 12 + current_month <= last_month_key:
+            monthly_dates.append(date(current_year, current_month, 1))
+            current_year, current_month = add_months(current_year, current_month, 1)
+    else:
+        monthly_title = f"MONTHLY TABLE ({monthly_months} months)"
+        monthly_dates = []
+        for offset in range(monthly_months - 1, -1, -1):
+            year, month = add_months(today_start.year, today_start.month, -offset)
+            monthly_dates.append(date(year, month, 1))
+
+    for month_date in monthly_dates:
+        year, month = month_date.year, month_date.month
         key = f"{year:04d}-{month:02d}"
         token_stats = token_by_month.get(key, PeriodStats())
         monthly_rows.append(
@@ -1095,6 +1179,9 @@ def build_report(
         heatmap_weeks=heatmap_weeks,
         heatmap_header=heat_header,
         heatmap_lines=heat_lines,
+        selected_range=selected_range,
+        daily_title=daily_title,
+        monthly_title=monthly_title,
         model_30d=sorted_model_30d,
         model_all_time=sorted_model_all,
         daily_rows=daily_rows,
@@ -1227,6 +1314,18 @@ def to_json_dict(report: Report, codex_home: Path) -> dict:
             "top_token_day": {"date": report.top_token_day, "tokens": report.top_token_count},
             "top_model_30d": report.top_model_30d,
         },
+        "selected_range": (
+            {
+                "label": report.selected_range.label,
+                "start_date": report.selected_range.start_date,
+                "end_date": report.selected_range.end_date,
+                "stats": asdict(report.selected_range.stats),
+                "cost": asdict(report.selected_range.cost),
+                "cost_coverage_pct": cost_coverage(report.selected_range.cost),
+            }
+            if report.selected_range
+            else None
+        ),
         "pricing": {
             "verified_at": report.pricing_verified_at,
             "scope_note": report.pricing_scope_note,
@@ -1375,6 +1474,17 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
             style,
         )
     )
+    if report.selected_range:
+        lines.extend(
+            render_table_box(
+                f"SELECTED RANGE ({report.selected_range.label})",
+                ["Range", "P", "S", "Turns", "Input", "Cache", "Output", "Reason", "Total", "API $"],
+                [period_detail_row("Selected", report.selected_range.stats, report.selected_range.cost)],
+                [8, 4, 4, 5, 7, 7, 7, 7, 7, 9],
+                ["left", "right", "right", "right", "right", "right", "right", "right", "right", "right"],
+                style,
+            )
+        )
 
     heat_rows = [style.paint(report.heatmap_header, "dim")]
     for raw_row in report.heatmap_lines:
@@ -1431,11 +1541,11 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
         )
     )
 
-    if view in {"normal", "full"}:
+    if view in {"normal", "full"} or report.daily_title.startswith("DAILY ACTIVITY"):
         peak_daily_tokens = max((row.tokens for row in report.daily_rows), default=0)
         lines.extend(
             render_table_box(
-                f"RECENT ACTIVITY ({len(report.daily_rows)} days)",
+                report.daily_title,
                 ["Date", "P", "S", "Turns", "Input", "Cache", "Output", "Reason", "Total", "API $", "Load"],
                 [
                     [
@@ -1463,7 +1573,7 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
     lines.extend(render_panel(f"MONTHLY TREND ({len(report.monthly_rows)} months)", [style.paint("Token sparkline:", "dim") + " " + sparkline], style, layout_width))
     lines.extend(
         render_table_box(
-            "MONTHLY TABLE",
+            report.monthly_title,
             ["Month", "P", "Turns", "Input", "Cache", "Output", "Reason", "Total", "API $"],
             [
                 [
@@ -1534,6 +1644,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--heatmap-weeks", type=int, default=16)
     parser.add_argument("--daily-days", type=int, default=7)
     parser.add_argument("--monthly-months", type=int, default=6)
+    parser.add_argument("--days", type=int, help="Show/select the last N days. Easy alias for daily range views.")
+    parser.add_argument("--months", type=int, help="Show/select the last N months. Easy alias for monthly range views.")
+    parser.add_argument("--day", help="Show one calendar day, formatted YYYY-MM-DD")
+    parser.add_argument("--month", help="Show one calendar month, formatted YYYY-MM")
+    parser.add_argument("--year", type=int, help="Show one calendar year, formatted YYYY")
+    parser.add_argument("--from", dest="date_from", help="Start date for a custom range, formatted YYYY-MM-DD")
+    parser.add_argument("--to", dest="date_to", help="End date for a custom range, formatted YYYY-MM-DD")
     parser.add_argument("--top-models", type=int, default=6)
     parser.add_argument("--no-color", action="store_true", help="Disable ANSI color output")
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of the terminal dashboard")
@@ -1563,6 +1680,86 @@ def main(argv: Sequence[str] | None = None) -> int:
     width = args.width or shutil.get_terminal_size((120, 40)).columns
     resolved_view = resolve_view(args.view, width)
     now = parse_local_time(args.now) if args.now else datetime.now().replace(microsecond=0)
+    today = now.date()
+
+    selector_count = sum(
+        1
+        for enabled in (
+            args.days is not None,
+            args.months is not None,
+            bool(args.day),
+            bool(args.month),
+            args.year is not None,
+            bool(args.date_from or args.date_to),
+        )
+        if enabled
+    )
+    if selector_count > 1:
+        parser.error("Use only one range selector: --day, --days, --month, --months, --year, or --from/--to")
+    if args.date_to and not args.date_from:
+        parser.error("--to requires --from")
+
+    daily_days = max(1, min(366, args.days if args.days is not None else args.daily_days))
+    monthly_months = max(1, min(60, args.months if args.months is not None else args.monthly_months))
+    selected_label: str | None = None
+    selected_start: date | None = None
+    selected_end: date | None = None
+    daily_start: date | None = None
+    daily_end: date | None = None
+    monthly_start: date | None = None
+    monthly_end: date | None = None
+
+    try:
+        if args.days is not None:
+            if args.days <= 0:
+                parser.error("--days must be greater than 0")
+            selected_label = f"last {daily_days} day{'s' if daily_days != 1 else ''}"
+            selected_start = today - timedelta(days=daily_days - 1)
+            selected_end = today
+            daily_start = selected_start
+            daily_end = selected_end
+        elif args.months is not None:
+            if args.months <= 0:
+                parser.error("--months must be greater than 0")
+            start_year, start_month = add_months(today.year, today.month, -(monthly_months - 1))
+            selected_label = f"last {monthly_months} month{'s' if monthly_months != 1 else ''}"
+            selected_start = date(start_year, start_month, 1)
+            selected_end = today
+            monthly_start = selected_start
+            monthly_end = selected_end
+        elif args.day:
+            selected_start = parse_date_value(args.day)
+            selected_end = selected_start
+            selected_label = args.day
+            daily_start = selected_start
+            daily_end = selected_end
+        elif args.month:
+            year, month = parse_month_value(args.month)
+            selected_start, selected_end = month_date_range(year, month)
+            selected_label = args.month
+            daily_start = selected_start
+            daily_end = selected_end
+            monthly_start = selected_start
+            monthly_end = selected_end
+        elif args.year is not None:
+            if args.year < 1970 or args.year > 9999:
+                parser.error("--year must be between 1970 and 9999")
+            selected_label = str(args.year)
+            selected_start = date(args.year, 1, 1)
+            selected_end = date(args.year, 12, 31)
+            monthly_start = selected_start
+            monthly_end = selected_end
+        elif args.date_from:
+            selected_start = parse_date_value(args.date_from)
+            selected_end = parse_date_value(args.date_to) if args.date_to else today
+            if selected_end < selected_start:
+                parser.error("--to must be on or after --from")
+            selected_label = f"{selected_start.isoformat()}..{selected_end.isoformat()}"
+            daily_start = selected_start
+            daily_end = selected_end
+    except ValueError as exc:
+        parser.error(f"Invalid date range: {exc}")
+
     codex_home = resolve_codex_home(args.codex_home)
     show_status = not args.json and not os.environ.get("CODEX_STATS_QUIET")
 
@@ -1576,10 +1773,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         report = build_report(
             codex_home,
             now=now,
-            daily_days=max(5, min(30, args.daily_days)),
-            monthly_months=max(3, min(18, args.monthly_months)),
+            daily_days=daily_days,
+            monthly_months=monthly_months,
             heatmap_weeks=max(4, min(52, args.heatmap_weeks)),
             top_models=max(3, min(12, args.top_models)),
+            selected_label=selected_label,
+            selected_start=selected_start,
+            selected_end=selected_end,
+            daily_start=daily_start,
+            daily_end=daily_end,
+            monthly_start=monthly_start,
+            monthly_end=monthly_end,
             status=emit_status,
         )
     except FileNotFoundError as exc:

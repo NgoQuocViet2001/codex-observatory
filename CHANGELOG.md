@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.15 - 2026-04-29
+
+- Added simple time selectors: `--day`, `--days`, `--month`, `--months`, `--year`, and inclusive `--from/--to`.
+- Added selected-range summary output and JSON metadata so custom date, month, and year views expose the same token detail as the main dashboard.
+- Documented the range commands in the npm README and usage guide.
+
 ## 1.2.14 - 2026-04-29
 
 - Added official GPT-5.5 API-equivalent pricing, including cached input and long-context rates for GPT-5.5/GPT-5.4-class frontier models when token events exceed 272K input tokens.
