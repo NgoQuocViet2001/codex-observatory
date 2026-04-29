@@ -34,6 +34,10 @@ codex stats full --top-models 8
 codex stats --json
 ```
 
+## Token Detail
+
+The dashboard includes input, cached input, output, reasoning, total token, turn, and API-estimate columns in the period, model, daily, monthly, and full day-of-week tables when session token logs are available.
+
 ## Direct Aliases
 
 If you prefer direct commands instead of the patched `codex` subcommand, these are equivalent:

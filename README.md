@@ -84,6 +84,8 @@ The first command removes the Codex integration and restores the patched `codex`
 - If `history.jsonl` is missing, Codex Observatory rebuilds prompt history from session logs.
 - If `sessions/` is missing but `history.jsonl` exists, Codex Observatory still renders prompt and session counts and falls back to zero token totals plus `unknown` model metadata.
 - Estimated spend uses built-in OpenAI API pricing by model, billing uncached input, cached input, and output separately.
+- GPT-5.5 pricing is included, with long-context rates applied for configured frontier models when a token event exceeds 272K input tokens.
+- Period, model, daily, monthly, and day-of-week tables expose input, cached input, output, reasoning, and total token detail where session logs contain token counts.
 - Spend figures are API-equivalent estimates only and may not match Codex app or subscription billing.
 - Pricing coverage is reported explicitly so unknown or unsupported models do not silently skew totals.
 

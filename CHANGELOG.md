@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.14 - 2026-04-29
+
+- Added official GPT-5.5 API-equivalent pricing, including cached input and long-context rates for GPT-5.5/GPT-5.4-class frontier models when token events exceed 272K input tokens.
+- Expanded period, 30d model, daily, monthly, and full day-of-week tables with turns plus input, cached input, output, reasoning, and total token detail.
+- Extended JSON output and regression tests for the new token detail fields and GPT-5.5 pricing coverage.
+
 ## 1.2.13 - 2026-04-03
 
 - Switched npm history backfills to stream session JSONL files instead of loading entire multi-GB logs into memory, preventing the large-session V8 crash in `codex stats full`.

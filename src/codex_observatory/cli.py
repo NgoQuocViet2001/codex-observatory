@@ -28,11 +28,19 @@ THEME = {
     "bar": "38;5;45",
     "dim": "38;5;244",
 }
-PRICING_VERIFIED_AT = "2026-03-29"
+PRICING_VERIFIED_AT = "2026-04-29"
 API_EQUIVALENT_NOTE = "Estimated API-equivalent spend only; Codex app or subscription billing may differ."
+LONG_CONTEXT_INPUT_THRESHOLD = 272_000
+LONG_CONTEXT_PRICING_NOTE = (
+    "Long-context rates are applied for configured models when a token event exceeds 272K input tokens."
+)
 PRICING_SOURCES = [
     "https://openai.com/api/pricing/",
+    "https://developers.openai.com/api/docs/pricing",
+    "https://developers.openai.com/api/docs/models/gpt-5.5",
+    "https://developers.openai.com/api/docs/models/gpt-5.5-pro",
     "https://developers.openai.com/api/docs/models/gpt-5.4",
+    "https://developers.openai.com/api/docs/models/gpt-5.4-pro",
     "https://developers.openai.com/api/docs/models/gpt-5.3-codex",
     "https://developers.openai.com/api/docs/models/gpt-5.2-codex",
     "https://developers.openai.com/api/docs/models/gpt-5.1",
@@ -52,6 +60,25 @@ class ModelPricing:
     input_usd_per_million: float
     cached_input_usd_per_million: float
     output_usd_per_million: float
+    long_context_input_usd_per_million: float | None = None
+    long_context_cached_input_usd_per_million: float | None = None
+    long_context_output_usd_per_million: float | None = None
+    long_context_input_threshold: int | None = None
+
+    def rates_for_input_tokens(self, input_tokens: int) -> tuple[float, float, float]:
+        if (
+            self.long_context_input_threshold is not None
+            and input_tokens > self.long_context_input_threshold
+            and self.long_context_input_usd_per_million is not None
+            and self.long_context_output_usd_per_million is not None
+        ):
+            cached_rate = (
+                self.long_context_cached_input_usd_per_million
+                if self.long_context_cached_input_usd_per_million is not None
+                else self.cached_input_usd_per_million
+            )
+            return self.long_context_input_usd_per_million, cached_rate, self.long_context_output_usd_per_million
+        return self.input_usd_per_million, self.cached_input_usd_per_million, self.output_usd_per_million
 
 
 MODEL_PRICING = {
@@ -67,9 +94,12 @@ MODEL_PRICING = {
     "gpt-5.2": ModelPricing(1.75, 0.175, 14.00),
     "gpt-5.2-codex": ModelPricing(1.75, 0.175, 14.00),
     "gpt-5.3-codex": ModelPricing(1.75, 0.175, 14.00),
-    "gpt-5.4": ModelPricing(2.50, 0.25, 15.00),
+    "gpt-5.4": ModelPricing(2.50, 0.25, 15.00, 5.00, 0.50, 22.50, LONG_CONTEXT_INPUT_THRESHOLD),
     "gpt-5.4-mini": ModelPricing(0.75, 0.075, 4.50),
     "gpt-5.4-nano": ModelPricing(0.20, 0.02, 1.25),
+    "gpt-5.4-pro": ModelPricing(30.00, 30.00, 180.00, 60.00, 60.00, 270.00, LONG_CONTEXT_INPUT_THRESHOLD),
+    "gpt-5.5": ModelPricing(5.00, 0.50, 30.00, 10.00, 1.00, 45.00, LONG_CONTEXT_INPUT_THRESHOLD),
+    "gpt-5.5-pro": ModelPricing(30.00, 30.00, 180.00, 60.00, 60.00, 270.00, LONG_CONTEXT_INPUT_THRESHOLD),
 }
 MODEL_ALIASES = {
     "gpt-5 mini": "gpt-5-mini",
@@ -79,6 +109,8 @@ MODEL_ALIASES = {
     "gpt-5.1 codex mini": "gpt-5.1-codex-mini",
     "gpt-5.4 mini": "gpt-5.4-mini",
     "gpt-5.4 nano": "gpt-5.4-nano",
+    "gpt-5.4 pro": "gpt-5.4-pro",
+    "gpt-5.5 pro": "gpt-5.5-pro",
 }
 
 
@@ -113,9 +145,14 @@ class TokenEvent:
 
 @dataclass
 class PeriodStats:
-    prompts: int
-    sessions: int
-    tokens: int
+    prompts: int = 0
+    sessions: int = 0
+    turns: int = 0
+    input_tokens: int = 0
+    cached_input_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_output_tokens: int = 0
+    tokens: int = 0
 
 
 @dataclass
@@ -123,6 +160,11 @@ class DailyRow:
     date: str
     prompts: int
     sessions: int
+    turns: int
+    input_tokens: int
+    cached_input_tokens: int
+    output_tokens: int
+    reasoning_output_tokens: int
     tokens: int
     cost_usd: float
 
@@ -131,6 +173,11 @@ class DailyRow:
 class MonthlyRow:
     month: str
     prompts: int
+    turns: int
+    input_tokens: int
+    cached_input_tokens: int
+    output_tokens: int
+    reasoning_output_tokens: int
     tokens: int
     cost_usd: float
 
@@ -139,6 +186,11 @@ class MonthlyRow:
 class DOWRow:
     day: str
     prompts: int
+    turns: int
+    input_tokens: int
+    cached_input_tokens: int
+    output_tokens: int
+    reasoning_output_tokens: int
     tokens: int
     cost_usd: float
 
@@ -612,13 +664,34 @@ def load_sessions(codex_home: Path) -> tuple[list[TurnEvent], list[TokenEvent], 
     return turn_events, token_events, latest_token_time, latest_model
 
 
-def get_period_stats(prompts: Sequence[PromptEvent], tokens: Sequence[TokenEvent], start: datetime) -> PeriodStats:
+def add_token_breakdown(stats: PeriodStats, event: TokenEvent) -> None:
+    stats.input_tokens += event.input_tokens
+    stats.cached_input_tokens += event.cached_input_tokens
+    stats.output_tokens += event.output_tokens
+    stats.reasoning_output_tokens += event.reasoning_output_tokens
+    stats.tokens += event.total_tokens
+
+
+def dow_index(timestamp: datetime) -> int:
+    return (timestamp.weekday() + 1) if timestamp.weekday() < 6 else 0
+
+
+def get_period_stats(
+    prompts: Sequence[PromptEvent],
+    turns: Sequence[TurnEvent],
+    tokens: Sequence[TokenEvent],
+    start: datetime,
+) -> PeriodStats:
     prompt_slice = [event for event in prompts if event.timestamp >= start]
-    return PeriodStats(
+    stats = PeriodStats(
         prompts=len(prompt_slice),
         sessions=len({event.session_id for event in prompt_slice}),
-        tokens=sum(event.total_tokens for event in tokens if event.timestamp >= start),
+        turns=sum(1 for event in turns if event.timestamp >= start),
     )
+    for event in tokens:
+        if event.timestamp >= start:
+            add_token_breakdown(stats, event)
+    return stats
 
 
 def resolve_view(requested_view: str, width: int) -> str:
@@ -656,11 +729,12 @@ def resolve_model_pricing(model: str) -> tuple[str | None, ModelPricing | None]:
 def estimate_token_costs(input_tokens: int, cached_input_tokens: int, output_tokens: int, pricing: ModelPricing) -> tuple[float, float, float, float, float]:
     billed_cached_input = max(0, min(cached_input_tokens, input_tokens))
     billed_uncached_input = max(0, input_tokens - billed_cached_input)
-    input_cost = billed_uncached_input / 1_000_000 * pricing.input_usd_per_million
-    cached_input_cost = billed_cached_input / 1_000_000 * pricing.cached_input_usd_per_million
-    output_cost = output_tokens / 1_000_000 * pricing.output_usd_per_million
+    input_rate, cached_input_rate, output_rate = pricing.rates_for_input_tokens(input_tokens)
+    input_cost = billed_uncached_input / 1_000_000 * input_rate
+    cached_input_cost = billed_cached_input / 1_000_000 * cached_input_rate
+    output_cost = output_tokens / 1_000_000 * output_rate
     total_cost = input_cost + cached_input_cost + output_cost
-    cache_savings = billed_cached_input / 1_000_000 * (pricing.input_usd_per_million - pricing.cached_input_usd_per_million)
+    cache_savings = billed_cached_input / 1_000_000 * (input_rate - cached_input_rate)
     return input_cost, cached_input_cost, output_cost, total_cost, cache_savings
 
 
@@ -669,6 +743,16 @@ def apply_model_pricing(model_name: str, stats: ModelStats) -> bool:
     stats.pricing_model = pricing_model
     if pricing is None:
         return False
+    if stats.total_tokens and any(
+        (
+            stats.input_cost_usd,
+            stats.cached_input_cost_usd,
+            stats.output_cost_usd,
+            stats.total_cost_usd,
+            stats.cache_savings_usd,
+        )
+    ):
+        return True
     (
         stats.input_cost_usd,
         stats.cached_input_cost_usd,
@@ -677,6 +761,30 @@ def apply_model_pricing(model_name: str, stats: ModelStats) -> bool:
         stats.cache_savings_usd,
     ) = estimate_token_costs(stats.input_tokens, stats.cached_input_tokens, stats.output_tokens, pricing)
     return True
+
+
+def add_model_token_event(stats: ModelStats, event: TokenEvent) -> None:
+    stats.input_tokens += event.input_tokens
+    stats.cached_input_tokens += event.cached_input_tokens
+    stats.output_tokens += event.output_tokens
+    stats.reasoning_output_tokens += event.reasoning_output_tokens
+    stats.total_tokens += event.total_tokens
+
+    pricing_model, pricing = resolve_model_pricing(event.model)
+    stats.pricing_model = pricing_model
+    if pricing is None:
+        return
+    input_cost, cached_input_cost, output_cost, total_cost, cache_savings = estimate_token_costs(
+        event.input_tokens,
+        event.cached_input_tokens,
+        event.output_tokens,
+        pricing,
+    )
+    stats.input_cost_usd += input_cost
+    stats.cached_input_cost_usd += cached_input_cost
+    stats.output_cost_usd += output_cost
+    stats.total_cost_usd += total_cost
+    stats.cache_savings_usd += cache_savings
 
 
 def summarize_costs(tokens: Sequence[TokenEvent], *, start: datetime | None = None) -> CostStats:
@@ -754,33 +862,41 @@ def build_report(
     sessions_by_date: dict[str, set[str]] = {}
     for event in prompt_events:
         prompt_by_hour[event.timestamp.hour] += 1
-        prompt_by_dow[(event.timestamp.weekday() + 1) if event.timestamp.weekday() < 6 else 0] += 1
+        prompt_by_dow[dow_index(event.timestamp)] += 1
         sessions_by_date.setdefault(event.date_key, set()).add(event.session_id)
 
-    token_by_date = Counter()
-    token_by_month = Counter()
-    token_by_dow = [0] * 7
+    turn_by_date = Counter(event.timestamp.strftime("%Y-%m-%d") for event in turn_events)
+    turn_by_month = Counter(event.timestamp.strftime("%Y-%m") for event in turn_events)
+    turn_by_dow = [0] * 7
+    for event in turn_events:
+        turn_by_dow[dow_index(event.timestamp)] += 1
+
+    token_by_date: dict[str, PeriodStats] = {}
+    token_by_month: dict[str, PeriodStats] = {}
+    token_by_dow = [PeriodStats() for _ in range(7)]
     cost_by_date: dict[str, float] = {}
     cost_by_month: dict[str, float] = {}
     cost_by_dow = [0.0] * 7
     for event in token_events:
-        token_by_date[event.date_key] += event.total_tokens
-        token_by_month[event.month_key] += event.total_tokens
-        token_by_dow[event.dow] += event.total_tokens
+        add_token_breakdown(token_by_date.setdefault(event.date_key, PeriodStats()), event)
+        add_token_breakdown(token_by_month.setdefault(event.month_key, PeriodStats()), event)
+        add_token_breakdown(token_by_dow[event.dow], event)
         event_cost = estimate_event_cost_total(event)
         cost_by_date[event.date_key] = cost_by_date.get(event.date_key, 0.0) + event_cost
         cost_by_month[event.month_key] = cost_by_month.get(event.month_key, 0.0) + event_cost
         cost_by_dow[event.dow] += event_cost
 
     today_start = datetime(now.year, now.month, now.day)
-    stats_today = get_period_stats(prompt_events, token_events, today_start)
-    stats_7d = get_period_stats(prompt_events, token_events, today_start - timedelta(days=6))
-    stats_30d = get_period_stats(prompt_events, token_events, today_start - timedelta(days=29))
+    stats_today = get_period_stats(prompt_events, turn_events, token_events, today_start)
+    stats_7d = get_period_stats(prompt_events, turn_events, token_events, today_start - timedelta(days=6))
+    stats_30d = get_period_stats(prompt_events, turn_events, token_events, today_start - timedelta(days=29))
     all_time = PeriodStats(
         prompts=len(prompt_events),
         sessions=len({event.session_id for event in prompt_events}),
-        tokens=sum(event.total_tokens for event in token_events),
+        turns=len(turn_events),
     )
+    for event in token_events:
+        add_token_breakdown(all_time, event)
 
     first_prompt_date = min((event.timestamp.date() for event in prompt_events), default=today_start.date())
     usage_span_days = max(1, (today_start.date() - first_prompt_date).days + 1)
@@ -816,7 +932,8 @@ def build_report(
     top_token_day = "n/a"
     top_token_count = 0
     if token_by_date:
-        top_token_day, top_token_count = sorted(token_by_date.items(), key=lambda item: (-item[1], item[0]))[0]
+        top_token_day, top_token_stats = sorted(token_by_date.items(), key=lambda item: (-item[1].tokens, item[0]))[0]
+        top_token_count = top_token_stats.tokens
 
     busiest_hour = max(range(24), key=lambda hour: (prompt_by_hour[hour], -hour))
     busiest_dow_index = max(range(7), key=lambda index: (prompt_by_dow[index], -index))
@@ -827,11 +944,7 @@ def build_report(
         model_all_time.setdefault(event.model, ModelStats()).turns += 1
     for event in token_events:
         stats = model_all_time.setdefault(event.model, ModelStats())
-        stats.input_tokens += event.input_tokens
-        stats.cached_input_tokens += event.cached_input_tokens
-        stats.output_tokens += event.output_tokens
-        stats.reasoning_output_tokens += event.reasoning_output_tokens
-        stats.total_tokens += event.total_tokens
+        add_model_token_event(stats, event)
 
     model_30d: dict[str, ModelStats] = {name: ModelStats() for name in model_all_time}
     window_start = today_start - timedelta(days=29)
@@ -841,11 +954,7 @@ def build_report(
     for event in token_events:
         if event.timestamp >= window_start:
             stats = model_30d.setdefault(event.model, ModelStats())
-            stats.input_tokens += event.input_tokens
-            stats.cached_input_tokens += event.cached_input_tokens
-            stats.output_tokens += event.output_tokens
-            stats.reasoning_output_tokens += event.reasoning_output_tokens
-            stats.total_tokens += event.total_tokens
+            add_model_token_event(stats, event)
 
     for name, stats in model_all_time.items():
         apply_model_pricing(name, stats)
@@ -877,12 +986,18 @@ def build_report(
     for offset in range(daily_days - 1, -1, -1):
         day = today_start.date() - timedelta(days=offset)
         key = day.strftime("%Y-%m-%d")
+        token_stats = token_by_date.get(key, PeriodStats())
         daily_rows.append(
             DailyRow(
                 date=day.strftime("%m-%d"),
                 prompts=prompt_by_date.get(key, 0),
                 sessions=len(sessions_by_date.get(key, set())),
-                tokens=token_by_date.get(key, 0),
+                turns=turn_by_date.get(key, 0),
+                input_tokens=token_stats.input_tokens,
+                cached_input_tokens=token_stats.cached_input_tokens,
+                output_tokens=token_stats.output_tokens,
+                reasoning_output_tokens=token_stats.reasoning_output_tokens,
+                tokens=token_stats.tokens,
                 cost_usd=cost_by_date.get(key, 0.0),
             )
         )
@@ -891,11 +1006,17 @@ def build_report(
     for offset in range(monthly_months - 1, -1, -1):
         year, month = add_months(today_start.year, today_start.month, -offset)
         key = f"{year:04d}-{month:02d}"
+        token_stats = token_by_month.get(key, PeriodStats())
         monthly_rows.append(
             MonthlyRow(
                 month=key,
                 prompts=prompt_by_month.get(key, 0),
-                tokens=token_by_month.get(key, 0),
+                turns=turn_by_month.get(key, 0),
+                input_tokens=token_stats.input_tokens,
+                cached_input_tokens=token_stats.cached_input_tokens,
+                output_tokens=token_stats.output_tokens,
+                reasoning_output_tokens=token_stats.reasoning_output_tokens,
+                tokens=token_stats.tokens,
                 cost_usd=cost_by_month.get(key, 0.0),
             )
         )
@@ -931,7 +1052,12 @@ def build_report(
         DOWRow(
             day=DOW_NAMES[index],
             prompts=prompt_by_dow[index],
-            tokens=token_by_dow[index],
+            turns=turn_by_dow[index],
+            input_tokens=token_by_dow[index].input_tokens,
+            cached_input_tokens=token_by_dow[index].cached_input_tokens,
+            output_tokens=token_by_dow[index].output_tokens,
+            reasoning_output_tokens=token_by_dow[index].reasoning_output_tokens,
+            tokens=token_by_dow[index].tokens,
             cost_usd=cost_by_dow[index],
         )
         for index in range(7)
@@ -1046,6 +1172,39 @@ def ranked_themes(count: int) -> list[str | None]:
     return out
 
 
+def period_detail_row(label: str, stats: PeriodStats, cost: CostStats) -> list[str]:
+    return [
+        label,
+        format_int(stats.prompts),
+        format_int(stats.sessions),
+        format_int(stats.turns),
+        format_short(stats.input_tokens),
+        format_short(stats.cached_input_tokens),
+        format_short(stats.output_tokens),
+        format_short(stats.reasoning_output_tokens),
+        format_short(stats.tokens),
+        format_usd(cost.total_cost_usd),
+    ]
+
+
+def model_detail_rows(items: Sequence[tuple[str, ModelStats]]) -> list[list[str]]:
+    total_tokens = sum(stats.total_tokens for _, stats in items) or 1
+    return [
+        [
+            name,
+            format_int(stats.turns),
+            format_short(stats.input_tokens),
+            format_short(stats.cached_input_tokens),
+            format_short(stats.output_tokens),
+            format_short(stats.reasoning_output_tokens),
+            format_short(stats.total_tokens),
+            format_usd(stats.total_cost_usd) if stats.pricing_model else "n/a",
+            f"{(stats.total_tokens / total_tokens) * 100:.1f}%",
+        ]
+        for name, stats in items
+    ]
+
+
 def to_json_dict(report: Report, codex_home: Path) -> dict:
     return {
         "generated_at": report.generated_at.isoformat(),
@@ -1071,6 +1230,8 @@ def to_json_dict(report: Report, codex_home: Path) -> dict:
         "pricing": {
             "verified_at": report.pricing_verified_at,
             "scope_note": report.pricing_scope_note,
+            "long_context_note": LONG_CONTEXT_PRICING_NOTE,
+            "long_context_input_threshold": LONG_CONTEXT_INPUT_THRESHOLD,
             "sources": PRICING_SOURCES,
             "unpriced_models": report.unpriced_models,
         },
@@ -1191,6 +1352,7 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
         style.paint(f"30d cache savings vs uncached input: {format_usd(report.thirty_days_cost.cache_savings_usd)}", "good"),
         style.paint(f"Pricing coverage: {cost_coverage(report.all_time_cost):.1f}% of all-time tokens", "accent"),
         style.paint(f"Pricing verified: {report.pricing_verified_at}", "dim"),
+        style.paint(LONG_CONTEXT_PRICING_NOTE, "dim"),
     ]
     if report.unpriced_models:
         preview = ", ".join(report.unpriced_models[:3])
@@ -1198,6 +1360,21 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
             preview += f" (+{len(report.unpriced_models) - 3} more)"
         cost_rows.append(style.paint(f"Unpriced models: {preview}", "warn"))
     lines.extend(render_panel("API COST SNAPSHOT", cost_rows, style, layout_width))
+    lines.extend(
+        render_table_box(
+            "TOKEN DETAIL (periods)",
+            ["Period", "P", "S", "Turns", "Input", "Cache", "Output", "Reason", "Total", "API $"],
+            [
+                period_detail_row("Today", report.today, report.today_cost),
+                period_detail_row("7d", report.seven_days, report.seven_days_cost),
+                period_detail_row("30d", report.thirty_days, report.thirty_days_cost),
+                period_detail_row("All", report.all_time, report.all_time_cost),
+            ],
+            [6, 4, 4, 5, 7, 7, 7, 7, 7, 9],
+            ["left", "right", "right", "right", "right", "right", "right", "right", "right", "right"],
+            style,
+        )
+    )
 
     heat_rows = [style.paint(report.heatmap_header, "dim")]
     for raw_row in report.heatmap_lines:
@@ -1242,24 +1419,13 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
     )
     lines.extend(render_panel(f"HEATMAP (prompts, last {report.heatmap_weeks} weeks)", heat_rows, style, layout_width))
 
-    total_30_tokens = sum(stats.total_tokens for _, stats in report.model_30d) or 1
     lines.extend(
         render_table_box(
             "MODEL BREAKDOWN (30d)",
-            ["Model", "Turns", "Tokens", "API $", "Share", "Cache"],
-            [
-                [
-                    name,
-                    format_int(stats.turns),
-                    format_short(stats.total_tokens),
-                    format_usd(stats.total_cost_usd) if stats.pricing_model else "n/a",
-                    f"{(stats.total_tokens / total_30_tokens) * 100:.1f}%",
-                    f"{(stats.cached_input_tokens / stats.input_tokens * 100) if stats.input_tokens else 0.0:.1f}%",
-                ]
-                for name, stats in report.model_30d
-            ],
-            [28, 9, 10, 10, 8, 8],
-            ["left", "right", "right", "right", "right", "right"],
+            ["Model", "Turns", "Input", "Cache", "Output", "Reason", "Total", "API $", "Share"],
+            model_detail_rows(report.model_30d),
+            [18, 5, 7, 7, 7, 7, 7, 8, 6] if view == "compact" else [22, 5, 9, 9, 8, 8, 9, 9, 7],
+            ["left", "right", "right", "right", "right", "right", "right", "right", "right"],
             style,
             ranked_themes(len(report.model_30d)),
         )
@@ -1270,20 +1436,25 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
         lines.extend(
             render_table_box(
                 f"RECENT ACTIVITY ({len(report.daily_rows)} days)",
-                ["Date", "Prompts", "Sessions", "Tokens", "API $", "Load"],
+                ["Date", "P", "S", "Turns", "Input", "Cache", "Output", "Reason", "Total", "API $", "Load"],
                 [
                     [
                         style.paint(row.date, "good") if row is report.daily_rows[-1] else row.date,
                         format_int(row.prompts),
                         format_int(row.sessions),
+                        format_int(row.turns),
+                        format_short(row.input_tokens),
+                        format_short(row.cached_input_tokens),
+                        format_short(row.output_tokens),
+                        format_short(row.reasoning_output_tokens),
                         format_short(row.tokens),
                         format_usd(row.cost_usd),
-                        make_bar(row.tokens, peak_daily_tokens, 20, style),
+                        make_bar(row.tokens, peak_daily_tokens, 12, style),
                     ]
                     for row in report.daily_rows
                 ],
-                [10, 9, 10, 11, 10, 20],
-                ["left", "right", "right", "right", "right", "left"],
+                [5, 5, 5, 5, 8, 8, 8, 8, 8, 9, 12],
+                ["left", "right", "right", "right", "right", "right", "right", "right", "right", "right", "left"],
                 style,
             )
         )
@@ -1293,43 +1464,34 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
     lines.extend(
         render_table_box(
             "MONTHLY TABLE",
-            ["Month", "Prompts", "Tokens", "API $"],
+            ["Month", "P", "Turns", "Input", "Cache", "Output", "Reason", "Total", "API $"],
             [
                 [
                     style.paint(row.month, "good") if row is report.monthly_rows[-1] else row.month,
                     format_int(row.prompts),
+                    format_int(row.turns),
+                    format_short(row.input_tokens),
+                    format_short(row.cached_input_tokens),
+                    format_short(row.output_tokens),
+                    format_short(row.reasoning_output_tokens),
                     format_short(row.tokens),
                     format_usd(row.cost_usd),
                 ]
                 for row in report.monthly_rows
             ],
-            [10, 10, 12, 10],
-            ["left", "right", "right", "right"],
+            [7, 6, 6, 9, 9, 8, 8, 9, 9],
+            ["left", "right", "right", "right", "right", "right", "right", "right", "right"],
             style,
         )
     )
 
     if view == "full":
-        total_all_tokens = sum(stats.total_tokens for _, stats in report.model_all_time) or 1
         lines.extend(
             render_table_box(
                 "MODEL BREAKDOWN (all-time)",
                 ["Model", "Turns", "Input", "Cache", "Output", "Reason", "Total", "API $", "Share"],
-                [
-                    [
-                        name,
-                        format_int(stats.turns),
-                        format_short(stats.input_tokens),
-                        format_short(stats.cached_input_tokens),
-                        format_short(stats.output_tokens),
-                        format_short(stats.reasoning_output_tokens),
-                        format_short(stats.total_tokens),
-                        format_usd(stats.total_cost_usd) if stats.pricing_model else "n/a",
-                        f"{(stats.total_tokens / total_all_tokens) * 100:.1f}%",
-                    ]
-                    for name, stats in report.model_all_time
-                ],
-                [24, 8, 10, 10, 10, 10, 10, 10, 8],
+                model_detail_rows(report.model_all_time),
+                [22, 5, 9, 9, 8, 8, 9, 9, 7],
                 ["left", "right", "right", "right", "right", "right", "right", "right", "right"],
                 style,
                 ranked_themes(len(report.model_all_time)),
@@ -1340,19 +1502,24 @@ def render_report(report: Report, *, view: str, width: int, use_color: bool) -> 
         lines.extend(
             render_table_box(
                 "DAY-OF-WEEK PATTERN (all-time)",
-                ["Day", "Prompts", "Tokens", "API $", "Load"],
+                ["Day", "P", "Turns", "Input", "Cache", "Output", "Reason", "Total", "API $", "Load"],
                 [
                     [
                         style.paint(row.day, "hot") if row.day == report.busiest_day else row.day,
                         format_int(row.prompts),
+                        format_int(row.turns),
+                        format_short(row.input_tokens),
+                        format_short(row.cached_input_tokens),
+                        format_short(row.output_tokens),
+                        format_short(row.reasoning_output_tokens),
                         format_short(row.tokens),
                         format_usd(row.cost_usd),
-                        make_bar(row.tokens, peak_dow_tokens, 20, style),
+                        make_bar(row.tokens, peak_dow_tokens, 12, style),
                     ]
                     for row in report.dow_rows
                 ],
-                [8, 10, 12, 10, 20],
-                ["left", "right", "right", "right", "left"],
+                [3, 6, 6, 9, 9, 8, 8, 9, 9, 12],
+                ["left", "right", "right", "right", "right", "right", "right", "right", "right", "left"],
                 style,
             )
         )
